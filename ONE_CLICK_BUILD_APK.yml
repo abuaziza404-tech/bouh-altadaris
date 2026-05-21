@@ -1,0 +1,100 @@
+name: ONE CLICK BUILD APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find BOUH ZIP file
+        run: |
+          echo "Files in repository:"
+          ls -lah
+
+          ZIP_FILE=$(find . -maxdepth 1 -iname "BOUH_EXPO*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: لم أجد ملف BOUH_EXPO_FIELD_COMMANDER_V12_5_SOURCE.zip في المستودع"
+            echo "الحل: ارفع ملف BOUH_EXPO_FIELD_COMMANDER_V12_5_SOURCE.zip في الصفحة الرئيسية للمستودع"
+            exit 1
+          fi
+
+          echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
+          echo "Found ZIP: $ZIP_FILE"
+
+      - name: Unzip source package
+        run: |
+          rm -rf build_src
+          mkdir build_src
+          unzip -q "$ZIP_FILE" -d build_src
+
+          echo "Package content:"
+          find build_src -maxdepth 3 -type f | head -100
+
+      - name: Locate Expo project
+        run: |
+          PROJECT_DIR=$(find build_src -name package.json -type f | head -n 1 | xargs dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: لم أجد package.json داخل الحزمة"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Expo project directory: $PROJECT_DIR"
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: |
+          cd "$PROJECT_DIR"
+          npm install --legacy-peer-deps
+
+      - name: Expo prebuild Android
+        run: |
+          cd "$PROJECT_DIR"
+          npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR/android"
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p output
+
+          APK=$(find "$PROJECT_DIR/android/app/build/outputs/apk/release" -name "*.apk" | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERROR: لم يتم العثور على APK بعد البناء"
+            exit 1
+          fi
+
+          cp "$APK" output/BOUH-GOLD-PRO-ULTRA-V12-5.apk
+          ls -lah output
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BOUH-GOLD-PRO-ULTRA-V12-5-APK
+          path: output/BOUH-GOLD-PRO-ULTRA-V12-5.apk
