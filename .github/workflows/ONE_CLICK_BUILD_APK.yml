@@ -60,17 +60,40 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android licenses and install tools
+      - name: Install Android SDK tools for Buildozer
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "build-tools;34.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-      - name: Patch buildozer.spec Android versions
+          yes | sdkmanager --licenses || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "build-tools;34.0.0" || true
+
+          sdkmanager "build-tools;37.0.0" || true
+
+          yes | sdkmanager --licenses || true
+
+          mkdir -p "$HOME/.buildozer/android/platform"
+
+          rm -rf "$HOME/.buildozer/android/platform/android-sdk"
+
+          ln -s "$ANDROID_SDK_ROOT" "$HOME/.buildozer/android/platform/android-sdk"
+
+          echo "Buildozer SDK path:"
+          ls -lah "$HOME/.buildozer/android/platform/"
+          ls -lah "$HOME/.buildozer/android/platform/android-sdk/build-tools" || true
+
+      - name: Patch buildozer.spec
         run: |
           sed -i 's/android.api = .*/android.api = 35/' buildozer.spec
           sed -i 's/android.minapi = .*/android.minapi = 23/' buildozer.spec
           sed -i 's/android.ndk = .*/android.ndk = 25b/' buildozer.spec
 
+          echo ""
           echo "---- buildozer.spec ----"
           cat buildozer.spec
 
@@ -85,13 +108,18 @@ jobs:
           python3 --version
           java -version
           buildozer --version
-          sdkmanager --list | head -80
+          sdkmanager --list | head -120
 
       - name: Build V5 APK
         run: |
-          export ANDROID_HOME=$ANDROID_SDK_ROOT
-          export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT
-          export PATH=$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/35.0.0:$PATH
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/35.0.0:$ANDROID_SDK_ROOT/build-tools/37.0.0:$PATH"
+
+          echo "Using SDK:"
+          echo "$ANDROID_SDK_ROOT"
+          ls -lah "$HOME/.buildozer/android/platform/android-sdk/build-tools" || true
+
           buildozer android debug
 
       - name: Find APK
