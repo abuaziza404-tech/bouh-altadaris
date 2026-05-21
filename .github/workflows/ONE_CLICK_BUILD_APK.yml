@@ -6,143 +6,1046 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify V5 files
-        run: |
-          ls -lah
-
-          if [ ! -f app.py ]; then
-            echo "ERROR: app.py not found"
-            exit 1
-          fi
-
-          if [ ! -f buildozer.spec ]; then
-            echo "ERROR: buildozer.spec not found"
-            exit 1
-          fi
-
-          if [ ! -f requirements.txt ]; then
-            echo "ERROR: requirements.txt not found"
-            exit 1
-          fi
-
-          echo "V5 files found."
-
-      - name: Install system packages
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3-pip \
-            python3-setuptools \
-            python3-wheel \
-            python3-venv \
-            git \
-            zip \
-            unzip \
-            openjdk-17-jdk \
-            autoconf \
-            libtool \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev \
-            libncursesw5-dev \
-            libtinfo6 \
-            cmake \
-            libffi-dev \
-            libssl-dev \
-            build-essential
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK tools for Buildozer
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Create BOUH Terrain V5 Stable Android Project
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          rm -rf android_app
+          mkdir -p android_app/app/src/main/java/com/abuaziza/bouhgoldpro
+          mkdir -p android_app/app/src/main/res/values
 
-          yes | sdkmanager --licenses || true
+          cat > android_app/settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
 
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "build-tools;34.0.0" || true
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
 
-          sdkmanager "build-tools;37.0.0" || true
+          rootProject.name = "BOUHTerrainV5Stable"
+          include ":app"
+          EOF
 
-          yes | sdkmanager --licenses || true
+          cat > android_app/build.gradle <<'EOF'
+          plugins {
+              id "com.android.application" version "8.6.1" apply false
+          }
+          EOF
 
-          mkdir -p "$HOME/.buildozer/android/platform"
+          cat > android_app/app/build.gradle <<'EOF'
+          plugins {
+              id "com.android.application"
+          }
 
-          rm -rf "$HOME/.buildozer/android/platform/android-sdk"
+          android {
+              namespace "com.abuaziza.bouhgoldpro"
+              compileSdk 35
 
-          ln -s "$ANDROID_SDK_ROOT" "$HOME/.buildozer/android/platform/android-sdk"
+              defaultConfig {
+                  applicationId "com.abuaziza.bouhgoldpro"
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 200
+                  versionName "12.5.5"
+              }
+          }
+          EOF
 
-          echo "Buildozer SDK path:"
-          ls -lah "$HOME/.buildozer/android/platform/"
-          ls -lah "$HOME/.buildozer/android/platform/android-sdk/build-tools" || true
+          cat > android_app/app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#050805</item>
+                  <item name="android:navigationBarColor">#050805</item>
+                  <item name="android:colorAccent">#D8B94A</item>
+              </style>
+          </resources>
+          EOF
 
-      - name: Patch buildozer.spec
+          cat > android_app/app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+              <uses-permission android:name="android.permission.INTERNET"/>
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="BOUH TERRAIN V5"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="portrait"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > android_app/app/src/main/java/com/abuaziza/bouhgoldpro/MainActivity.java <<'EOF'
+          package com.abuaziza.bouhgoldpro;
+
+          import android.Manifest;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.content.*;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.location.Location;
+          import android.location.LocationManager;
+          import android.net.Uri;
+          import android.text.InputType;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.*;
+          import java.util.*;
+
+          public class MainActivity extends Activity {
+
+              LinearLayout root;
+              LinearLayout content;
+
+              EditText latInput;
+              EditText lonInput;
+              EditText noteInput;
+              EditText aiInput;
+
+              TextView resultView;
+              TextView gpsView;
+              TextView aiView;
+
+              CheckBox cbStructure;
+              CheckBox cbPattern;
+              CheckBox cbAlteration;
+              CheckBox cbQuartz;
+              CheckBox cbDark;
+              CheckBox cbWadi;
+              CheckBox cbOldWork;
+              CheckBox cbGpz;
+              CheckBox cbVirgin;
+
+              Spinner magneticSpinner;
+
+              ArrayList<Target> targets = new ArrayList<>();
+
+              int BG = Color.rgb(5, 8, 5);
+              int CARD = Color.rgb(13, 22, 13);
+              int CARD2 = Color.rgb(7, 16, 7);
+              int GOLD = Color.rgb(216, 185, 74);
+              int TXT = Color.rgb(234, 255, 234);
+              int MUTED = Color.rgb(160, 180, 160);
+              int RED = Color.rgb(150, 35, 35);
+
+              static class Target {
+                  String lat;
+                  String lon;
+                  String score;
+                  String cls;
+                  String decision;
+                  String note;
+
+                  Target(String lat, String lon, String score, String cls, String decision, String note) {
+                      this.lat = lat;
+                      this.lon = lon;
+                      this.score = score;
+                      this.cls = cls;
+                      this.decision = decision;
+                      this.note = note;
+                  }
+              }
+
+              static class RefPoint {
+                  String id;
+                  double lat;
+                  double lon;
+                  String kind;
+
+                  RefPoint(String id, double lat, double lon, String kind) {
+                      this.id = id;
+                      this.lat = lat;
+                      this.lon = lon;
+                      this.kind = kind;
+                  }
+              }
+
+              RefPoint[] analogs = new RefPoint[]{
+                      new RefPoint("A1", 19.793522, 36.556198, "GPZ Hand-Pit Dark Regolith"),
+                      new RefPoint("A2", 19.834457, 36.478347, "GPZ Regolith Loader Expansion"),
+                      new RefPoint("A3", 20.492444, 36.348738, "Dark Knoll / Pediment"),
+                      new RefPoint("A4", 20.494440, 36.360965, "Hybrid Wadi Corridor"),
+                      new RefPoint("A5", 19.547212, 36.280184, "Dark Pediment / Hill-Foot Strip"),
+                      new RefPoint("A6", 21.075710, 36.341820, "Mountain Feeder / Wadi Interface"),
+                      new RefPoint("TargetB", 20.780500, 36.450700, "Target B HOLD+")
+              };
+
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+
+                  if (android.os.Build.VERSION.SDK_INT >= 23) {
+                      requestPermissions(new String[]{
+                              Manifest.permission.ACCESS_FINE_LOCATION,
+                              Manifest.permission.ACCESS_COARSE_LOCATION
+                      }, 1);
+                  }
+
+                  loadTargets();
+                  buildShell();
+                  showDashboard();
+              }
+
+              void buildShell() {
+                  ScrollView scroll = new ScrollView(this);
+
+                  root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setBackgroundColor(BG);
+                  root.setPadding(dp(12), dp(18), dp(12), dp(30));
+
+                  scroll.addView(root);
+
+                  TextView title = tv("BOUH TERRAIN | ABU AZIZA SYSTEM V5", 21, GOLD, true);
+                  title.setGravity(Gravity.CENTER);
+                  root.addView(title);
+
+                  TextView sub = tv("V12.5.5 — Stable Native Android", 13, MUTED, false);
+                  sub.setGravity(Gravity.CENTER);
+                  root.addView(sub);
+
+                  LinearLayout row1 = row();
+                  row1.addView(nav("Dashboard", v -> showDashboard()));
+                  row1.addView(nav("Analyze", v -> showAnalyze()));
+                  row1.addView(nav("GPS/Map", v -> showMap()));
+
+                  LinearLayout row2 = row();
+                  row2.addView(nav("Data", v -> showData()));
+                  row2.addView(nav("AI", v -> showAI()));
+                  row2.addView(nav("Export", v -> showExport()));
+
+                  root.addView(row1);
+                  root.addView(row2);
+
+                  content = col();
+                  root.addView(content);
+
+                  setContentView(scroll);
+              }
+
+              Button nav(String text, View.OnClickListener l) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setTextSize(12);
+                  b.setTypeface(null, Typeface.BOLD);
+                  b.setTextColor(Color.rgb(7, 16, 7));
+                  b.setBackgroundColor(GOLD);
+                  b.setOnClickListener(l);
+
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1);
+                  lp.setMargins(dp(3), dp(5), dp(3), dp(5));
+                  b.setLayoutParams(lp);
+
+                  return b;
+              }
+
+              void clear() {
+                  content.removeAllViews();
+              }
+
+              void showDashboard() {
+                  clear();
+
+                  String text =
+                          "SYSTEM_STATUS=ACTIVE\n" +
+                          "APP=BOUH Terrain | Abu Aziza System\n" +
+                          "DEVELOPER=Ahmed Abu Aziza\n" +
+                          "VERSION=12.5.5\n" +
+                          "MODE=Native Android Stable\n" +
+                          "NPM=0\n" +
+                          "EXPO=0\n" +
+                          "BUILDOZER=0\n\n" +
+
+                          "MODULES:\n" +
+                          "Dashboard=1\n" +
+                          "GPS=1\n" +
+                          "Google Maps Link=1\n" +
+                          "Target Register=1\n" +
+                          "CSV Export=1\n" +
+                          "KML Export=1\n" +
+                          "AI Rule Engine=1\n" +
+                          "GPZ Strategy=1\n" +
+                          "Analog A1-A6=1\n" +
+                          "Klemm/KCL Summary=1\n\n" +
+
+                          "STRICT NUMERIC PROTOCOL:\n" +
+                          "Raw spectral bands inside APK=0\n" +
+                          "CLAY_INDEX=0.000000 until spectral_pixels.sqlite is added\n" +
+                          "IRON_OXIDE_INDEX=0.000000 until spectral_pixels.sqlite is added\n" +
+                          "SILICA_INDEX=0.000000 until spectral_pixels.sqlite is added\n\n" +
+
+                          "DATA_PATH:\n" +
+                          "/Android/data/com.abuaziza.bouhgoldpro/files/BOUH_DATA/\n\n" +
+
+                          "SAVED_TARGETS=" + targets.size();
+
+                  content.addView(card("Dashboard", tv(text, 15, TXT, false)));
+              }
+
+              void showAnalyze() {
+                  clear();
+
+                  LinearLayout box = col();
+
+                  latInput = input("Latitude مثال: 19.973186", true);
+                  lonInput = input("Longitude مثال: 36.745590", true);
+                  noteInput = input("ملاحظات: quartz, dark, wadi, GPZ, loader...", false);
+                  noteInput.setMinLines(3);
+                  noteInput.setGravity(Gravity.TOP);
+
+                  cbStructure = check("Structure / Lineament");
+                  cbPattern = check("Pattern / Cluster");
+                  cbAlteration = check("Alteration / Clay / Red rock");
+                  cbQuartz = check("Quartz / Silica");
+                  cbDark = check("Dark regolith / black slope");
+                  cbWadi = check("Wadi edge / feeder outlet");
+                  cbOldWork = check("Old workings / loader analog");
+                  cbGpz = check("Repeatable GPZ signal");
+                  cbVirgin = check("Virgin pre-digging similarity");
+
+                  magneticSpinner = new Spinner(this);
+                  ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                          this,
+                          android.R.layout.simple_spinner_dropdown_item,
+                          new String[]{
+                                  "Magnetic Risk Medium",
+                                  "Magnetic Risk High",
+                                  "Magnetic Risk Low"
+                          }
+                  );
+                  magneticSpinner.setAdapter(adapter);
+
+                  Button gps = btn("التقاط GPS", CARD2, TXT);
+                  gps.setOnClickListener(v -> captureGPS());
+
+                  Button run = btn("تحليل + حفظ", GOLD, Color.rgb(7, 16, 7));
+                  run.setOnClickListener(v -> analyzeTarget());
+
+                  gpsView = tv("GPS=not captured", 13, MUTED, false);
+
+                  box.addView(label("Coordinates"));
+                  box.addView(latInput);
+                  box.addView(lonInput);
+                  box.addView(gps);
+                  box.addView(gpsView);
+
+                  box.addView(label("Magnetic Ground Risk"));
+                  box.addView(magneticSpinner);
+
+                  box.addView(label("BOUH Indicators"));
+                  box.addView(cbStructure);
+                  box.addView(cbPattern);
+                  box.addView(cbAlteration);
+                  box.addView(cbQuartz);
+                  box.addView(cbDark);
+                  box.addView(cbWadi);
+                  box.addView(cbOldWork);
+                  box.addView(cbGpz);
+                  box.addView(cbVirgin);
+
+                  box.addView(noteInput);
+                  box.addView(run);
+
+                  resultView = tv("RESULT=none", 15, TXT, false);
+
+                  content.addView(card("Field Target Analyzer", box));
+                  content.addView(card("BOUH Numeric Result", resultView));
+              }
+
+              void analyzeTarget() {
+                  double lat;
+                  double lon;
+
+                  try {
+                      lat = Double.parseDouble(latInput.getText().toString().trim());
+                      lon = Double.parseDouble(lonInput.getText().toString().trim());
+                  } catch (Exception e) {
+                      resultView.setText("ERROR=invalid_coordinates");
+                      return;
+                  }
+
+                  double S = 0;
+                  double A = 0;
+                  double P = 0;
+                  double F = 0;
+
+                  ArrayList<String> reasons = new ArrayList<>();
+
+                  if (cbStructure.isChecked()) {
+                      S += 70;
+                      reasons.add("structure=1");
+                  }
+
+                  if (cbPattern.isChecked()) {
+                      P += 60;
+                      reasons.add("pattern=1");
+                  }
+
+                  if (cbAlteration.isChecked()) {
+                      A += 45;
+                      reasons.add("alteration=1");
+                  }
+
+                  if (cbQuartz.isChecked()) {
+                      A += 30;
+                      reasons.add("quartz=1");
+                  }
+
+                  if (cbDark.isChecked()) {
+                      F += 20;
+                      reasons.add("dark_regolith=1");
+                  }
+
+                  if (cbWadi.isChecked()) {
+                      P += 20;
+                      reasons.add("wadi_trap=1");
+                  }
+
+                  if (cbOldWork.isChecked()) {
+                      F += 15;
+                      reasons.add("old_work_analog=1");
+                  }
+
+                  if (cbGpz.isChecked()) {
+                      F += 35;
+                      reasons.add("gpz_repeat=1");
+                  }
+
+                  if (cbVirgin.isChecked()) {
+                      P += 15;
+                      reasons.add("virgin_ground=1");
+                  }
+
+                  RefPoint nearest = nearestAnalog(lat, lon);
+                  double dAnalog = distanceKm(lat, lon, nearest.lat, nearest.lon);
+
+                  if (dAnalog <= 3.0) {
+                      F += 15;
+                      P += 10;
+                      reasons.add("near_analog=" + nearest.id);
+                  } else if (dAnalog <= 8.0) {
+                      F += 7;
+                      reasons.add("regional_analog=" + nearest.id);
+                  }
+
+                  S = clamp(S);
+                  A = clamp(A);
+                  P = clamp(P);
+                  F = clamp(F);
+
+                  double score = (0.35 * S) + (0.30 * A) + (0.20 * P) + (0.15 * F);
+
+                  boolean hasStructure = cbStructure.isChecked();
+                  boolean hasPattern = cbPattern.isChecked();
+                  boolean hasAlteration = cbAlteration.isChecked() || cbQuartz.isChecked() || cbDark.isChecked();
+                  boolean hasField = cbGpz.isChecked() || cbOldWork.isChecked();
+
+                  if (!hasStructure && !hasPattern && !hasField) {
+                      score = 0;
+                      reasons.add("KILL=no_structure_no_pattern");
+                  }
+
+                  if (!hasAlteration && !hasField) {
+                      score = Math.min(score, 54);
+                      reasons.add("HOLD=no_alteration_no_field");
+                  }
+
+                  String cls;
+                  String decision;
+
+                  if (score >= 85 && hasStructure && hasAlteration) {
+                      cls = "S-Tier Target";
+                      decision = "FIELD_PRIORITY_1";
+                  } else if (score >= 70) {
+                      cls = "Candidate";
+                      decision = "FIELD_CHECK";
+                  } else if (score >= 55) {
+                      cls = "HOLD";
+                      decision = "FAST_CHECK_ONLY";
+                  } else if (score == 0) {
+                      cls = "KILL";
+                      decision = "DO_NOT_DIG";
+                  } else {
+                      cls = "LOW";
+                      decision = "DO_NOT_DIG";
+                  }
+
+                  String gpz = gpzAdvice();
+
+                  String out =
+                          "TARGET_CONFIDENCE=" + fmt(score) + "%\n" +
+                          "S=" + fmt(S) + "\n" +
+                          "A=" + fmt(A) + "\n" +
+                          "P=" + fmt(P) + "\n" +
+                          "F=" + fmt(F) + "\n" +
+                          "CLASS=" + cls + "\n" +
+                          "DECISION=" + decision + "\n" +
+                          "NEAREST_ANALOG=" + nearest.id + "\n" +
+                          "ANALOG_DISTANCE_KM=" + fmt(dAnalog) + "\n\n" +
+                          "SPECTRAL_SOURCE=no_raw_pixel\n" +
+                          "CLAY_INDEX=0.000000\n" +
+                          "IRON_OXIDE_INDEX=0.000000\n" +
+                          "SILICA_INDEX=0.000000\n" +
+                          "ELEVATION_M=0.000\n\n" +
+                          "GPZ_STRATEGY:\n" + gpz + "\n\n" +
+                          "REASONS:\n" + join(reasons) + "\n\n" +
+                          "NOTE=" + noteInput.getText().toString();
+
+                  resultView.setText(out);
+
+                  Target t = new Target(
+                          f6(lat),
+                          f6(lon),
+                          fmt(score),
+                          cls,
+                          decision,
+                          noteInput.getText().toString()
+                  );
+
+                  targets.add(0, t);
+                  saveTargets();
+
+                  Toast.makeText(this, "Target saved", Toast.LENGTH_SHORT).show();
+              }
+
+              String gpzAdvice() {
+                  int i = magneticSpinner.getSelectedItemPosition();
+
+                  if (i == 1) {
+                      return "Ground Type=Severe/Difficult\nGold Mode=High Yield\nSensitivity=8-11\nAudio Smoothing=Low/On\nSwing=Slow";
+                  }
+
+                  if (i == 2) {
+                      return "Ground Type=Normal\nGold Mode=General/Deep\nSensitivity=12-16\nAudio Smoothing=Off";
+                  }
+
+                  return "Ground Type=Difficult\nGold Mode=High Yield\nSensitivity=9-12\nIncrease only if stable";
+              }
+
+              void showMap() {
+                  clear();
+
+                  LinearLayout box = col();
+
+                  Button gps = btn("التقاط GPS", GOLD, Color.rgb(7, 16, 7));
+                  gps.setOnClickListener(v -> captureGPS());
+
+                  Button maps = btn("فتح آخر هدف في Google Maps", GOLD, Color.rgb(7, 16, 7));
+                  maps.setOnClickListener(v -> openLastMap());
+
+                  String text =
+                          "MAP_ENGINE=GPS_LINK_MODE\n" +
+                          "OFFLINE_MBTILES=planned_V6\n" +
+                          "TERRAIN_RGB=planned_V6\n\n" +
+                          "DATA_PATH:\n" +
+                          "/Android/data/com.abuaziza.bouhgoldpro/files/BOUH_DATA/\n\n" +
+                          "TERRAIN_RGB_FORMULA:\n" +
+                          "Elevation=-10000+((R*256*256+G*256+B)*0.1)";
+
+                  box.addView(gps);
+                  box.addView(maps);
+                  box.addView(tv(text, 15, TXT, false));
+
+                  content.addView(card("GPS / Map / Terrain", box));
+              }
+
+              void showData() {
+                  clear();
+
+                  StringBuilder sb = new StringBuilder();
+
+                  sb.append("EMBEDDED_ANALOGS\n");
+                  for (RefPoint r : analogs) {
+                      sb.append(r.id).append(",");
+                      sb.append(f6(r.lat)).append(",");
+                      sb.append(f6(r.lon)).append(",");
+                      sb.append(r.kind).append("\n");
+                  }
+
+                  sb.append("\nKLEMM_KCL_SUMMARY\n");
+                  sb.append("Tibiri=oxidized_quartz_cavities\n");
+                  sb.append("Hadanaib=red_quartz_limonite_hematite\n");
+                  sb.append("Rigag_Sageib=shear_hosted_quartz_cavities\n");
+                  sb.append("Kamoli_Wadi_Rak=graphite_schist_boudinaged_quartz\n");
+
+                  sb.append("\nDATA_PACKAGE_MANAGER\n");
+                  sb.append("spectral_pixels.sqlite=required_for_real_pixel_analysis\n");
+                  sb.append("mbtiles=required_for_offline_map\n");
+                  sb.append("terrain_rgb.mbtiles=required_for_elevation_3d\n");
+
+                  content.addView(card("Data / KCL / Analogs", tv(sb.toString(), 14, TXT, false)));
+              }
+
+              void showAI() {
+                  clear();
+
+                  LinearLayout box = col();
+
+                  aiInput = input("اكتب وصف الأرض: quartz dark wadi GPZ loader red clay...", false);
+                  aiInput.setMinLines(4);
+
+                  Button run = btn("RUN OFFLINE AI RULE ENGINE", GOLD, Color.rgb(7, 16, 7));
+                  run.setOnClickListener(v -> runAI());
+
+                  aiView = tv("AI_OUTPUT=none", 15, TXT, false);
+
+                  box.addView(aiInput);
+                  box.addView(run);
+                  box.addView(aiView);
+
+                  content.addView(card("Offline AI Rule Engine", box));
+              }
+
+              void runAI() {
+                  String s = aiInput.getText().toString().toLowerCase(Locale.US);
+
+                  int score = 0;
+
+                  int quartz = contains(s, "quartz", "كوارتز") ? 1 : 0;
+                  int dark = contains(s, "dark", "black", "سود", "داكن") ? 1 : 0;
+                  int wadi = contains(s, "wadi", "وادي", "شعب") ? 1 : 0;
+                  int gpz = contains(s, "gpz", "إشارة", "اشارة") ? 1 : 0;
+                  int old = contains(s, "loader", "لودر", "حفر") ? 1 : 0;
+                  int structure = contains(s, "structure", "lineament", "كسر", "بنية") ? 1 : 0;
+                  int clay = contains(s, "clay", "red", "طين", "احمر", "أحمر") ? 1 : 0;
+
+                  score += structure * 25;
+                  score += quartz * 20;
+                  score += clay * 15;
+                  score += dark * 12;
+                  score += wadi * 12;
+                  score += gpz * 20;
+                  score += old * 10;
+
+                  if (structure == 0 && gpz == 0) {
+                      score = 0;
+                  }
+
+                  String out =
+                          "AI_SCORE=" + score + "%\n" +
+                          "structure=" + structure + "\n" +
+                          "quartz=" + quartz + "\n" +
+                          "clay_red=" + clay + "\n" +
+                          "dark_regolith=" + dark + "\n" +
+                          "wadi=" + wadi + "\n" +
+                          "gpz=" + gpz + "\n" +
+                          "old_work=" + old + "\n\n" +
+                          "AI_TYPE=offline_rule_engine\n" +
+                          "LLM=0\n" +
+                          "INTERNET_REQUIRED=0";
+
+                  aiView.setText(out);
+              }
+
+              void showExport() {
+                  clear();
+
+                  LinearLayout box = col();
+
+                  Button log = btn("عرض السجل", GOLD, Color.rgb(7, 16, 7));
+                  log.setOnClickListener(v -> showLog());
+
+                  Button csv = btn("نسخ CSV", GOLD, Color.rgb(7, 16, 7));
+                  csv.setOnClickListener(v -> copyCSV());
+
+                  Button kml = btn("نسخ KML", GOLD, Color.rgb(7, 16, 7));
+                  kml.setOnClickListener(v -> copyKML());
+
+                  box.addView(log);
+                  box.addView(csv);
+                  box.addView(kml);
+
+                  content.addView(card("Export / Target Register", box));
+              }
+
+              void showLog() {
+                  clear();
+
+                  LinearLayout box = col();
+
+                  box.addView(tv(logText(), 14, TXT, false));
+
+                  Button maps = btn("فتح آخر هدف في Google Maps", GOLD, Color.rgb(7, 16, 7));
+                  maps.setOnClickListener(v -> openLastMap());
+
+                  Button clear = btn("حذف السجل", RED, Color.WHITE);
+                  clear.setOnClickListener(v -> {
+                      targets.clear();
+                      saveTargets();
+                      showLog();
+                  });
+
+                  box.addView(maps);
+                  box.addView(clear);
+
+                  content.addView(card("Saved Targets", box));
+              }
+
+              void captureGPS() {
+                  try {
+                      LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+                      if (android.os.Build.VERSION.SDK_INT >= 23 &&
+                              checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                          if (gpsView != null) gpsView.setText("GPS_PERMISSION_REQUIRED=1");
+                          return;
+                      }
+
+                      Location loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                      if (loc == null) loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+                      if (loc == null) {
+                          if (gpsView != null) gpsView.setText("GPS_STATUS=no_location_yet");
+                          return;
+                      }
+
+                      String la = f6(loc.getLatitude());
+                      String lo = f6(loc.getLongitude());
+
+                      if (latInput != null) latInput.setText(la);
+                      if (lonInput != null) lonInput.setText(lo);
+
+                      if (gpsView != null) {
+                          gpsView.setText("GPS_LAT=" + la + "\nGPS_LON=" + lo + "\nACCURACY_M=" + Math.round(loc.getAccuracy()));
+                      }
+
+                  } catch (Exception e) {
+                      if (gpsView != null) gpsView.setText("GPS_ERROR=" + e.getMessage());
+                  }
+              }
+
+              void openLastMap() {
+                  if (targets.size() == 0) {
+                      Toast.makeText(this, "No saved targets", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+
+                  Target t = targets.get(0);
+
+                  Intent i = new Intent(Intent.ACTION_VIEW,
+                          Uri.parse("geo:" + t.lat + "," + t.lon + "?q=" + t.lat + "," + t.lon + "(BOUH " + t.score + "%)"));
+
+                  startActivity(i);
+              }
+
+              RefPoint nearestAnalog(double lat, double lon) {
+                  RefPoint best = analogs[0];
+                  double bd = 999999;
+
+                  for (RefPoint r : analogs) {
+                      double d = distanceKm(lat, lon, r.lat, r.lon);
+                      if (d < bd) {
+                          bd = d;
+                          best = r;
+                      }
+                  }
+
+                  return best;
+              }
+
+              double distanceKm(double lat1, double lon1, double lat2, double lon2) {
+                  double R = 6371.0088;
+                  double p1 = Math.toRadians(lat1);
+                  double p2 = Math.toRadians(lat2);
+                  double dp = Math.toRadians(lat2 - lat1);
+                  double dl = Math.toRadians(lon2 - lon1);
+
+                  double a = Math.sin(dp / 2) * Math.sin(dp / 2)
+                          + Math.cos(p1) * Math.cos(p2)
+                          * Math.sin(dl / 2) * Math.sin(dl / 2);
+
+                  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              }
+
+              double clamp(double v) {
+                  if (v < 0) return 0;
+                  if (v > 100) return 100;
+                  return v;
+              }
+
+              String fmt(double v) {
+                  return String.format(Locale.US, "%.2f", v);
+              }
+
+              String f6(double v) {
+                  return String.format(Locale.US, "%.6f", v);
+              }
+
+              boolean contains(String s, String... arr) {
+                  for (String a : arr) {
+                      if (s.contains(a.toLowerCase(Locale.US))) return true;
+                  }
+                  return false;
+              }
+
+              String join(ArrayList<String> list) {
+                  StringBuilder sb = new StringBuilder();
+                  for (String x : list) {
+                      sb.append("- ").append(x).append("\n");
+                  }
+                  return sb.toString();
+              }
+
+              String logText() {
+                  if (targets.size() == 0) return "NO_TARGETS=1";
+
+                  StringBuilder sb = new StringBuilder();
+
+                  for (int i = 0; i < targets.size(); i++) {
+                      Target t = targets.get(i);
+                      sb.append(i + 1).append(") ");
+                      sb.append("LAT=").append(t.lat).append(" ");
+                      sb.append("LON=").append(t.lon).append("\n");
+                      sb.append("SCORE=").append(t.score).append("% ");
+                      sb.append("CLASS=").append(t.cls).append("\n");
+                      sb.append("DECISION=").append(t.decision).append("\n");
+                      sb.append("NOTE=").append(t.note).append("\n\n");
+                  }
+
+                  return sb.toString();
+              }
+
+              void copyCSV() {
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("lat,lon,score,class,decision,note\n");
+
+                  for (Target t : targets) {
+                      sb.append(q(t.lat)).append(",");
+                      sb.append(q(t.lon)).append(",");
+                      sb.append(q(t.score)).append(",");
+                      sb.append(q(t.cls)).append(",");
+                      sb.append(q(t.decision)).append(",");
+                      sb.append(q(t.note)).append("\n");
+                  }
+
+                  copy("BOUH_CSV", sb.toString());
+              }
+
+              void copyKML() {
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+                  sb.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>");
+                  sb.append("<name>BOUH Targets</name>");
+
+                  for (int i = 0; i < targets.size(); i++) {
+                      Target t = targets.get(i);
+                      sb.append("<Placemark>");
+                      sb.append("<name>BOUH ").append(i + 1).append(" ").append(t.score).append("%</name>");
+                      sb.append("<description><![CDATA[");
+                      sb.append("CLASS=").append(t.cls).append("<br>");
+                      sb.append("DECISION=").append(t.decision).append("<br>");
+                      sb.append("NOTE=").append(t.note);
+                      sb.append("]]></description>");
+                      sb.append("<Point><coordinates>").append(t.lon).append(",").append(t.lat).append(",0</coordinates></Point>");
+                      sb.append("</Placemark>");
+                  }
+
+                  sb.append("</Document></kml>");
+
+                  copy("BOUH_KML", sb.toString());
+              }
+
+              void copy(String label, String text) {
+                  android.content.ClipboardManager cm =
+                          (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+
+                  cm.setPrimaryClip(ClipData.newPlainText(label, text));
+                  Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show();
+              }
+
+              void loadTargets() {
+                  targets.clear();
+                  String raw = getPreferences(0).getString("targets", "");
+
+                  if (raw.length() == 0) return;
+
+                  String[] lines = raw.split("\\n");
+
+                  for (String line : lines) {
+                      String[] p = line.split("\\|", -1);
+
+                      if (p.length >= 6) {
+                          targets.add(new Target(p[0], p[1], p[2], p[3], p[4], p[5]));
+                      }
+                  }
+              }
+
+              void saveTargets() {
+                  StringBuilder sb = new StringBuilder();
+
+                  for (Target t : targets) {
+                      sb.append(clean(t.lat)).append("|");
+                      sb.append(clean(t.lon)).append("|");
+                      sb.append(clean(t.score)).append("|");
+                      sb.append(clean(t.cls)).append("|");
+                      sb.append(clean(t.decision)).append("|");
+                      sb.append(clean(t.note)).append("\n");
+                  }
+
+                  getPreferences(0).edit().putString("targets", sb.toString()).apply();
+              }
+
+              String clean(String s) {
+                  if (s == null) return "";
+                  return s.replace("|", "/").replace("\n", " ");
+              }
+
+              String q(String s) {
+                  return "\"" + clean(s).replace("\"", "\"\"") + "\"";
+              }
+
+              TextView label(String text) {
+                  return tv(text, 14, MUTED, true);
+              }
+
+              CheckBox check(String text) {
+                  CheckBox c = new CheckBox(this);
+                  c.setText(text);
+                  c.setTextSize(14);
+                  c.setTextColor(TXT);
+                  return c;
+              }
+
+              EditText input(String hint, boolean numeric) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setHintTextColor(MUTED);
+                  e.setTextColor(Color.WHITE);
+                  e.setTextSize(15);
+                  e.setBackgroundColor(CARD2);
+                  e.setPadding(dp(14), dp(10), dp(14), dp(10));
+
+                  if (numeric) {
+                      e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
+                  } else {
+                      e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+                  }
+
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+                  lp.setMargins(0, dp(6), 0, dp(8));
+                  e.setLayoutParams(lp);
+
+                  return e;
+              }
+
+              Button btn(String text, int bg, int color) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setTextSize(15);
+                  b.setTypeface(null, Typeface.BOLD);
+                  b.setTextColor(color);
+                  b.setBackgroundColor(bg);
+
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(52));
+                  lp.setMargins(0, dp(7), 0, dp(7));
+                  b.setLayoutParams(lp);
+
+                  return b;
+              }
+
+              TextView tv(String text, int size, int color, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(text);
+                  t.setTextSize(size);
+                  t.setTextColor(color);
+                  t.setPadding(dp(4), dp(6), dp(4), dp(6));
+
+                  if (bold) t.setTypeface(null, Typeface.BOLD);
+
+                  return t;
+              }
+
+              LinearLayout col() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.VERTICAL);
+                  return l;
+              }
+
+              LinearLayout row() {
+                  LinearLayout l = new LinearLayout(this);
+                  l.setOrientation(LinearLayout.HORIZONTAL);
+                  return l;
+              }
+
+              View card(String title, View child) {
+                  LinearLayout c = col();
+                  c.setPadding(dp(15), dp(13), dp(15), dp(13));
+                  c.setBackgroundColor(CARD);
+
+                  LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, -2);
+                  cp.setMargins(0, dp(12), 0, 0);
+                  c.setLayoutParams(cp);
+
+                  c.addView(tv(title, 18, GOLD, true));
+                  c.addView(child);
+
+                  return c;
+              }
+
+              int dp(int v) {
+                  return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+              }
+          }
+          EOF
+
+      - name: Build APK
         run: |
-          sed -i 's/android.api = .*/android.api = 35/' buildozer.spec
-          sed -i 's/android.minapi = .*/android.minapi = 23/' buildozer.spec
-          sed -i 's/android.ndk = .*/android.ndk = 25b/' buildozer.spec
-
-          echo ""
-          echo "---- buildozer.spec ----"
-          cat buildozer.spec
-
-      - name: Install Buildozer
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install "cython<3.0"
-          python3 -m pip install buildozer==1.5.0
-
-      - name: Show versions
-        run: |
-          python3 --version
-          java -version
-          buildozer --version
-          sdkmanager --list | head -120
-
-      - name: Build V5 APK
-        run: |
-          export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
-          export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/35.0.0:$ANDROID_SDK_ROOT/build-tools/37.0.0:$PATH"
-
-          echo "Using SDK:"
-          echo "$ANDROID_SDK_ROOT"
-          ls -lah "$HOME/.buildozer/android/platform/android-sdk/build-tools" || true
-
-          buildozer android debug
-
-      - name: Find APK
-        run: |
-          find . -name "*.apk" -type f
+          cd android_app
+          gradle :app:assembleDebug --stacktrace
 
       - name: Collect APK
         run: |
           mkdir -p output
-
-          APK=$(find bin -name "*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK not found"
-            find . -name "*.apk" -type f
-            exit 1
-          fi
-
-          cp "$APK" output/BOUH-TERRAIN-V5-PYTHON.apk
+          cp android_app/app/build/outputs/apk/debug/app-debug.apk output/BOUH-TERRAIN-V5-STABLE.apk
           ls -lah output
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BOUH-TERRAIN-V5-PYTHON-APK
-          path: output/BOUH-TERRAIN-V5-PYTHON.apk
+          name: BOUH-TERRAIN-V5-STABLE-APK
+          path: output/BOUH-TERRAIN-V5-STABLE.apk
