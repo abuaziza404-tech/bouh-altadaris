@@ -12,9 +12,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify required files
+      - name: Verify V5 files
         run: |
-          echo "Repository files:"
           ls -lah
 
           if [ ! -f app.py ]; then
@@ -28,8 +27,11 @@ jobs:
           fi
 
           if [ ! -f requirements.txt ]; then
-            echo "WARNING: requirements.txt not found"
+            echo "ERROR: requirements.txt not found"
+            exit 1
           fi
+
+          echo "V5 files found."
 
       - name: Install system packages
         run: |
@@ -55,25 +57,45 @@ jobs:
             libssl-dev \
             build-essential
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses and install tools
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "build-tools;34.0.0"
+
+      - name: Patch buildozer.spec Android versions
+        run: |
+          sed -i 's/android.api = .*/android.api = 35/' buildozer.spec
+          sed -i 's/android.minapi = .*/android.minapi = 23/' buildozer.spec
+          sed -i 's/android.ndk = .*/android.ndk = 25b/' buildozer.spec
+
+          echo "---- buildozer.spec ----"
+          cat buildozer.spec
+
       - name: Install Buildozer
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install "cython<3.0"
           python3 -m pip install buildozer==1.5.0
 
-      - name: Show Buildozer version
+      - name: Show versions
         run: |
-          buildozer --version
           python3 --version
           java -version
+          buildozer --version
+          sdkmanager --list | head -80
 
-      - name: Build Android APK
+      - name: Build V5 APK
         run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT
+          export PATH=$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/35.0.0:$PATH
           buildozer android debug
 
       - name: Find APK
         run: |
-          echo "Searching APK..."
           find . -name "*.apk" -type f
 
       - name: Collect APK
@@ -83,7 +105,7 @@ jobs:
           APK=$(find bin -name "*.apk" | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "ERROR: APK not found in bin/"
+            echo "ERROR: APK not found"
             find . -name "*.apk" -type f
             exit 1
           fi
