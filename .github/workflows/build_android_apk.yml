@@ -1,4 +1,4 @@
-name: ONE CLICK BUILD APK - BOUH REAL MAPS V11
+name: ONE CLICK BUILD APK - BOUH V12 SUPREME REAL GEOAI
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 80
 
     steps:
       - name: Checkout repository
@@ -34,22 +34,32 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Create BOUH Real Maps Android Project
+      - name: Create BOUH V12 Supreme Real GeoAI Android Project
         run: |
           rm -rf android_app
           mkdir -p android_app/app/src/main/java/com/abuaziza/bouhgoldpro
           mkdir -p android_app/app/src/main/res/values
+          mkdir -p android_app/app/src/main/res/drawable
           mkdir -p android_app/app/src/main/assets
 
           cat > android_app/settings.gradle <<'EOF'
           pluginManagement {
-              repositories { google(); mavenCentral(); gradlePluginPortal() }
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
           }
-          rootProject.name = "BOUHTerrainRealMapsV11"
+
+          rootProject.name = "BOUHTerrainV12SupremeRealGeoAI"
           include ":app"
           EOF
 
@@ -72,14 +82,15 @@ jobs:
                   applicationId "com.abuaziza.bouhgoldpro"
                   minSdk 23
                   targetSdk 35
-                  versionCode 1100
-                  versionName "11.0.0"
+                  versionCode 1200
+                  versionName "12.0.0"
               }
 
               buildTypes {
                   debug {
                       debuggable true
                   }
+
                   release {
                       minifyEnabled false
                   }
@@ -95,8 +106,39 @@ jobs:
                   <item name="android:statusBarColor">#05070A</item>
                   <item name="android:navigationBarColor">#05070A</item>
                   <item name="android:colorAccent">#D4AF37</item>
+                  <item name="android:windowActionModeOverlay">true</item>
+                  <item name="android:windowNoTitle">true</item>
               </style>
           </resources>
+          EOF
+
+          cat > android_app/app/src/main/res/drawable/ic_launcher.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+
+              <path
+                  android:fillColor="#05070A"
+                  android:pathData="M0,0h108v108h-108z"/>
+
+              <path
+                  android:fillColor="#D4AF37"
+                  android:pathData="M54,8a46,46 0,1 0,0.1 0M54,16a38,38 0,1 1,-0.1 0"/>
+
+              <path
+                  android:fillColor="#0E1318"
+                  android:pathData="M54,20a34,34 0,1 0,0.1 0"/>
+
+              <path
+                  android:fillColor="#D4AF37"
+                  android:pathData="M72,33c-8,-6 -18,-7 -27,-3c11,2 18,6 22,12c-7,-4 -15,-5 -24,-1c8,2 14,5 18,10c-8,-2 -15,-1 -22,4c8,0 14,2 19,7c-7,0 -13,3 -17,8c13,-4 23,-2 30,6c-2,-7 -5,-12 -10,-16c9,2 17,0 24,-5c-9,0 -15,-2 -20,-7c8,0 16,-5 22,-13c-6,2 -11,1 -15,-2z"/>
+
+              <path
+                  android:fillColor="#00E5FF"
+                  android:pathData="M72,38a4,4 0,1 0,0.1 0"/>
+          </vector>
           EOF
 
           cat > android_app/app/src/main/AndroidManifest.xml <<'EOF'
@@ -108,7 +150,8 @@ jobs:
 
               <application
                   android:theme="@style/AppTheme"
-                  android:label="بوح التضاريس V11"
+                  android:label="بوح التضاريس V12"
+                  android:icon="@drawable/ic_launcher"
                   android:usesCleartextTraffic="true"
                   android:hardwareAccelerated="true"
                   android:allowBackup="true"
@@ -135,12 +178,20 @@ jobs:
           import android.app.Activity;
           import android.os.Bundle;
           import android.os.Build;
-          import android.content.*;
+          import android.content.Intent;
           import android.content.pm.PackageManager;
-          import android.location.*;
+          import android.location.Geocoder;
+          import android.location.Location;
+          import android.location.LocationListener;
+          import android.location.LocationManager;
           import android.net.Uri;
           import android.view.ViewGroup;
-          import android.webkit.*;
+          import android.webkit.GeolocationPermissions;
+          import android.webkit.JavascriptInterface;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
           import android.widget.Toast;
 
           import java.io.File;
@@ -150,8 +201,10 @@ jobs:
           public class MainActivity extends Activity {
 
               WebView web;
-              double lastLat = 19.793522;
-              double lastLon = 36.556198;
+              double lastLat = 19.973186;
+              double lastLon = 36.745590;
+
+              static final String OWNER_EMAIL = "Abuaziza404@gmail.com";
 
               @Override
               protected void onCreate(Bundle b) {
@@ -161,8 +214,10 @@ jobs:
                       requestPermissions(new String[]{
                               Manifest.permission.ACCESS_FINE_LOCATION,
                               Manifest.permission.ACCESS_COARSE_LOCATION
-                      }, 7);
+                      }, 77);
                   }
+
+                  ensureFolders();
 
                   web = new WebView(this);
                   web.setLayoutParams(new ViewGroup.LayoutParams(
@@ -170,17 +225,20 @@ jobs:
                           ViewGroup.LayoutParams.MATCH_PARENT
                   ));
 
-                  WebSettings s = web.getSettings();
-                  s.setJavaScriptEnabled(true);
-                  s.setDomStorageEnabled(true);
-                  s.setDatabaseEnabled(true);
-                  s.setGeolocationEnabled(true);
-                  s.setAllowFileAccess(true);
-                  s.setAllowContentAccess(true);
-                  s.setLoadWithOverviewMode(true);
-                  s.setUseWideViewPort(true);
+                  WebSettings settings = web.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setGeolocationEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setLoadWithOverviewMode(true);
+                  settings.setUseWideViewPort(true);
+                  settings.setBuiltInZoomControls(false);
+                  settings.setDisplayZoomControls(false);
+
                   if (Build.VERSION.SDK_INT >= 21) {
-                      s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                      settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
                   }
 
                   web.setWebChromeClient(new WebChromeClient() {
@@ -197,7 +255,21 @@ jobs:
                   web.loadUrl("file:///android_asset/index.html");
               }
 
+              void ensureFolders() {
+                  File root = getExternalFilesDir(null);
+                  if (root == null) root = getFilesDir();
+
+                  new File(root, "BOUH_DATA").mkdirs();
+                  new File(root, "BOUH_DATA/targets").mkdirs();
+                  new File(root, "BOUH_DATA/spectral").mkdirs();
+                  new File(root, "BOUH_DATA/exports").mkdirs();
+                  new File(root, "BOUH_DATA/ai").mkdirs();
+                  new File(root, "BOUH_DATA/mbtiles").mkdirs();
+                  new File(root, "BOUH_EXPORTS").mkdirs();
+              }
+
               public class Bridge {
+
                   @JavascriptInterface
                   public void requestGPS() {
                       runOnUiThread(new Runnable() {
@@ -209,26 +281,39 @@ jobs:
                   }
 
                   @JavascriptInterface
-                  public void saveKML(String name, String kml) {
+                  public String getDataPath() {
+                      File root = getExternalFilesDir(null);
+                      if (root == null) root = getFilesDir();
+                      return root.getAbsolutePath() + "/BOUH_DATA";
+                  }
+
+                  @JavascriptInterface
+                  public void saveKML(String filename, String kml) {
                       try {
-                          File dir = new File(getExternalFilesDir(null), "BOUH_EXPORTS");
+                          File root = getExternalFilesDir(null);
+                          if (root == null) root = getFilesDir();
+
+                          File dir = new File(root, "BOUH_DATA/exports");
                           dir.mkdirs();
 
-                          if (name == null || name.trim().length() == 0) {
-                              name = "bouh_targets.kml";
+                          if (filename == null || filename.trim().length() == 0) {
+                              filename = "bouh_v12_targets.kml";
                           }
 
-                          File out = new File(dir, name.replace("/", "_"));
+                          filename = filename.replace("/", "_").replace("\\", "_");
+                          File out = new File(dir, filename);
+
                           FileOutputStream fos = new FileOutputStream(out);
                           fos.write(kml.getBytes("UTF-8"));
                           fos.close();
 
                           Toast.makeText(MainActivity.this, "KML saved: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
-                          Intent share = new Intent(Intent.ACTION_SEND);
-                          share.setType("text/plain");
-                          share.putExtra(Intent.EXTRA_TEXT, kml);
-                          startActivity(Intent.createChooser(share, "Share KML"));
+                          Intent send = new Intent(Intent.ACTION_SEND);
+                          send.setType("text/plain");
+                          send.putExtra(Intent.EXTRA_SUBJECT, "BOUH V12 KML Export");
+                          send.putExtra(Intent.EXTRA_TEXT, kml);
+                          startActivity(Intent.createChooser(send, "Share KML"));
 
                       } catch (Exception e) {
                           Toast.makeText(MainActivity.this, "KML save error", Toast.LENGTH_LONG).show();
@@ -236,12 +321,30 @@ jobs:
                   }
 
                   @JavascriptInterface
+                  public void sendEmailReport(String subject, String body) {
+                      try {
+                          Intent email = new Intent(Intent.ACTION_SENDTO);
+                          email.setData(Uri.parse("mailto:" + OWNER_EMAIL));
+                          email.putExtra(Intent.EXTRA_SUBJECT, subject == null ? "BOUH V12 Field Report" : subject);
+                          email.putExtra(Intent.EXTRA_TEXT, body == null ? "" : body);
+                          startActivity(Intent.createChooser(email, "Send report to developer"));
+                      } catch (Exception e) {
+                          Intent send = new Intent(Intent.ACTION_SEND);
+                          send.setType("text/plain");
+                          send.putExtra(Intent.EXTRA_EMAIL, new String[]{OWNER_EMAIL});
+                          send.putExtra(Intent.EXTRA_SUBJECT, subject == null ? "BOUH V12 Field Report" : subject);
+                          send.putExtra(Intent.EXTRA_TEXT, body == null ? "" : body);
+                          startActivity(Intent.createChooser(send, "Send report"));
+                      }
+                  }
+
+                  @JavascriptInterface
                   public void shareText(String title, String text) {
                       Intent send = new Intent(Intent.ACTION_SEND);
                       send.setType("text/plain");
-                      send.putExtra(Intent.EXTRA_SUBJECT, title);
-                      send.putExtra(Intent.EXTRA_TEXT, text);
-                      startActivity(Intent.createChooser(send, title));
+                      send.putExtra(Intent.EXTRA_SUBJECT, title == null ? "BOUH V12" : title);
+                      send.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+                      startActivity(Intent.createChooser(send, title == null ? "Share" : title));
                   }
               }
 
@@ -249,18 +352,18 @@ jobs:
                   try {
                       if (Build.VERSION.SDK_INT >= 23 &&
                               checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 7);
+                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 77);
                           return;
                       }
 
-                      LocationManager lm = (LocationManager)getSystemService(LOCATION_SERVICE);
+                      final LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
                       Location loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                       if (loc == null) loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
 
                       if (loc != null) {
                           lastLat = loc.getLatitude();
                           lastLon = loc.getLongitude();
-                          sendGPS();
+                          pushGPS();
                       }
 
                       lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, new LocationListener() {
@@ -268,7 +371,7 @@ jobs:
                           public void onLocationChanged(Location location) {
                               lastLat = location.getLatitude();
                               lastLon = location.getLongitude();
-                              sendGPS();
+                              pushGPS();
                           }
 
                           @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
@@ -276,12 +379,14 @@ jobs:
                           @Override public void onProviderDisabled(String provider) {}
                       }, null);
 
+                      Toast.makeText(this, "GPS updating...", Toast.LENGTH_SHORT).show();
+
                   } catch (Exception e) {
                       Toast.makeText(this, "GPS error", Toast.LENGTH_SHORT).show();
                   }
               }
 
-              void sendGPS() {
+              void pushGPS() {
                   final String js = String.format(
                           Locale.US,
                           "window.setNativeGPS && window.setNativeGPS(%.6f, %.6f);",
@@ -292,8 +397,11 @@ jobs:
                   runOnUiThread(new Runnable() {
                       @Override
                       public void run() {
-                          if (Build.VERSION.SDK_INT >= 19) web.evaluateJavascript(js, null);
-                          else web.loadUrl("javascript:" + js);
+                          if (Build.VERSION.SDK_INT >= 19) {
+                              web.evaluateJavascript(js, null);
+                          } else {
+                              web.loadUrl("javascript:" + js);
+                          }
                       }
                   });
               }
@@ -306,110 +414,251 @@ jobs:
           <head>
             <meta charset="utf-8"/>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-            <title>BOUH Terrain V11</title>
+            <title>BOUH Terrain V12 Supreme</title>
 
             <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
             <style>
+              :root {
+                --bg:#05070a;
+                --panel:#0b1116;
+                --panel2:#101820;
+                --gold:#d4af37;
+                --cyan:#00e5ff;
+                --green:#50e28a;
+                --red:#ff5c5c;
+                --text:#eaf7f7;
+                --muted:#9dafaf;
+              }
+
+              * { box-sizing:border-box; }
+
               html, body {
                 margin:0;
                 padding:0;
                 width:100%;
                 height:100%;
-                background:#05070a;
-                color:#eaf7f7;
-                font-family: system-ui, Arial, sans-serif;
                 overflow:hidden;
+                background:var(--bg);
+                color:var(--text);
+                font-family: system-ui, Arial, sans-serif;
               }
 
               #app {
-                display:flex;
-                flex-direction:column;
                 height:100vh;
                 width:100vw;
-                background:#05070a;
+                display:flex;
+                flex-direction:column;
+                background:linear-gradient(180deg,#05070a,#071013);
               }
 
-              #header {
-                background:#05070a;
-                border-bottom:1px solid rgba(212,175,55,.35);
+              #splash {
+                position:fixed;
+                inset:0;
+                z-index:99999;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                background:
+                  radial-gradient(circle at 50% 20%, rgba(212,175,55,.18), transparent 30%),
+                  linear-gradient(180deg,#10120f,#05070a 60%,#020304);
+              }
+
+              .splash-card {
+                width:88%;
+                max-width:420px;
+                border:1px solid rgba(212,175,55,.48);
+                border-radius:26px;
+                padding:24px;
+                text-align:center;
+                box-shadow:0 0 45px rgba(212,175,55,.18), inset 0 0 25px rgba(0,0,0,.65);
+                background:rgba(5,7,10,.88);
+              }
+
+              .eagle {
+                width:110px;
+                height:110px;
+                margin:0 auto 14px auto;
+                border-radius:50%;
+                border:3px solid var(--gold);
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:58px;
+                color:var(--gold);
+                box-shadow:0 0 25px rgba(212,175,55,.35);
+              }
+
+              .splash-title {
+                color:var(--gold);
+                font-size:28px;
+                font-weight:900;
+                line-height:1.2;
+              }
+
+              .splash-sub {
+                color:var(--text);
+                font-size:15px;
+                margin-top:8px;
+              }
+
+              .owner {
+                color:var(--gold);
+                font-size:13px;
+                margin-top:18px;
+                line-height:1.6;
+              }
+
+              #topbar {
+                flex:0 0 auto;
                 padding:8px 10px;
+                background:rgba(5,7,10,.98);
+                border-bottom:1px solid rgba(212,175,55,.35);
               }
 
               .title {
-                color:#d4af37;
-                font-weight:800;
+                color:var(--gold);
+                font-weight:900;
                 font-size:17px;
                 text-align:center;
+                line-height:1.3;
               }
 
-              .sub {
-                color:#00e5ff;
+              .subtitle {
+                color:var(--cyan);
                 font-size:11px;
                 text-align:center;
                 margin-top:2px;
               }
 
               #toolbar {
+                flex:0 0 auto;
                 display:grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns:repeat(4,1fr);
                 gap:5px;
                 padding:7px;
-                background:#081012;
+                background:#081014;
               }
 
-              button, select, input, textarea {
+              button, input, textarea, select {
                 border:0;
-                outline:0;
-                border-radius:8px;
-                padding:8px;
-                font-weight:700;
+                outline:none;
+                border-radius:10px;
+                padding:9px;
                 font-size:12px;
+                font-weight:800;
               }
 
               button {
-                background:#d4af37;
+                background:linear-gradient(180deg,#e2c767,#b58f24);
                 color:#05070a;
+                box-shadow:inset 0 0 10px rgba(255,255,255,.12);
               }
 
-              select, input, textarea {
-                background:#10181d;
-                color:#eaf7f7;
+              button.dark {
+                background:#101820;
+                color:var(--gold);
+                border:1px solid rgba(212,175,55,.35);
+              }
+
+              button.red {
+                background:#401313;
+                color:#fff;
+                border:1px solid rgba(255,92,92,.5);
+              }
+
+              input, textarea, select {
+                background:#0a1117;
+                color:var(--text);
                 border:1px solid rgba(212,175,55,.25);
               }
 
               #map {
                 flex:1;
                 width:100%;
-                background:#081012;
+                background:#091014;
               }
 
               #panel {
-                height:235px;
+                flex:0 0 280px;
                 overflow:auto;
-                background:#071013;
-                border-top:1px solid rgba(0,229,255,.35);
-                padding:8px;
+                background:#05090d;
+                border-top:1px solid rgba(0,229,255,.3);
+                padding:9px;
                 font-size:12px;
-                line-height:1.55;
+                line-height:1.58;
               }
 
-              .gold { color:#d4af37; font-weight:800; }
-              .cyan { color:#00e5ff; font-weight:800; }
-              .red { color:#ff5c5c; font-weight:800; }
-              .green { color:#5cff98; font-weight:800; }
+              .gold { color:var(--gold); font-weight:900; }
+              .cyan { color:var(--cyan); font-weight:900; }
+              .green { color:var(--green); font-weight:900; }
+              .red { color:var(--red); font-weight:900; }
+              .muted { color:var(--muted); }
 
-              .row {
+              .grid2 {
                 display:grid;
-                grid-template-columns: 1fr 1fr;
-                gap:6px;
-                margin-bottom:6px;
+                grid-template-columns:1fr 1fr;
+                gap:7px;
+              }
+
+              .grid3 {
+                display:grid;
+                grid-template-columns:repeat(3,1fr);
+                gap:7px;
+              }
+
+              .card {
+                background:#081015;
+                border:1px solid rgba(212,175,55,.22);
+                border-radius:15px;
+                padding:10px;
+                margin:7px 0;
+              }
+
+              .metric {
+                background:#071014;
+                border:1px solid rgba(80,226,138,.25);
+                border-radius:15px;
+                padding:10px;
+                text-align:center;
+              }
+
+              .metric b {
+                display:block;
+                color:var(--green);
+                font-size:22px;
+                margin-top:4px;
+              }
+
+              #modal {
+                display:none;
+                position:absolute;
+                z-index:9999;
+                left:8px;
+                right:8px;
+                top:86px;
+                max-height:78vh;
+                overflow:auto;
+                background:#05090d;
+                border:1px solid rgba(212,175,55,.55);
+                border-radius:20px;
+                padding:12px;
+                box-shadow:0 0 35px rgba(0,0,0,.8);
+              }
+
+              #modal textarea {
+                width:100%;
+                height:78px;
+                direction:ltr;
+                text-align:left;
               }
 
               .leaflet-control-layers {
                 direction:ltr;
                 text-align:left;
+                background:#05090d !important;
+                color:#111 !important;
               }
 
               .leaflet-popup-content {
@@ -418,202 +667,257 @@ jobs:
                 font-size:12px;
               }
 
-              #settings {
-                display:none;
-                position:absolute;
-                z-index:9999;
-                top:85px;
-                left:8px;
-                right:8px;
+              .leaflet-container {
                 background:#071013;
-                border:1px solid rgba(212,175,55,.45);
-                border-radius:14px;
-                padding:10px;
-                box-shadow:0 0 25px rgba(0,0,0,.75);
-              }
-
-              #settings textarea {
-                width:100%;
-                height:70px;
-                box-sizing:border-box;
-                direction:ltr;
-                text-align:left;
               }
             </style>
           </head>
 
           <body>
+            <div id="splash">
+              <div class="splash-card">
+                <div class="eagle">🦅</div>
+                <div class="splash-title">بوح التضاريس</div>
+                <div class="splash-title" style="font-size:20px">BOUH ALTADAREES</div>
+                <div class="splash-sub">منظومة الذكاء الاستكشافي الميداني</div>
+                <div class="owner">
+                  المطور والمالك الاستراتيجي:<br>
+                  Engineer Ahmed Abu Aziza Al-Rashidi<br>
+                  Abuaziza404@gmail.com
+                </div>
+              </div>
+            </div>
+
             <div id="app">
-              <div id="header">
-                <div class="title">بوح التضاريس | منظومة أبوعزيزه V11 REAL MAPS</div>
-                <div class="sub">GPS + Real Satellite + Terrain + NASA GIBS + Online Layers + KML Export</div>
+              <div id="topbar">
+                <div class="title">بوح التضاريس | منظومة أبوعزيزه V12 SUPREME</div>
+                <div class="subtitle">Real Satellite Maps + Terrain + GeoAI + Gold Proof Engine + KML</div>
               </div>
 
               <div id="toolbar">
                 <button onclick="goGPS()">GPS</button>
-                <button onclick="addManualTarget()">حفظ نقطة</button>
+                <button onclick="saveCurrent()">حفظ</button>
+                <button onclick="openModal('ai')">AI</button>
+                <button onclick="openModal('settings')">إعدادات</button>
                 <button onclick="exportKML()">KML</button>
-                <button onclick="toggleSettings()">إعدادات</button>
+                <button onclick="sendReport()">إرسال تقرير</button>
+                <button onclick="openModal('proof')">الإثبات</button>
+                <button onclick="openModal('data')">البيانات</button>
               </div>
 
-              <div id="settings">
-                <div class="gold">رابط طبقة XYZ مخصصة</div>
-                <div style="font-size:11px;color:#aab;margin:4px 0">
-                  ضع هنا رابط Tile XYZ مثل Sentinel Hub أو أي مزود أقمار عند توفر API.
-                  مثال الصيغة: https://server/tiles/{z}/{x}/{y}.png
-                </div>
-                <textarea id="customUrl" placeholder="https://.../{z}/{x}/{y}.png"></textarea>
-                <div class="row">
-                  <button onclick="addCustomLayer()">إضافة الطبقة</button>
-                  <button onclick="toggleSettings()">إغلاق</button>
-                </div>
-              </div>
-
+              <div id="modal"></div>
               <div id="map"></div>
-
-              <div id="panel">
-                <span class="cyan">جاهز.</span>
-                اضغط على الخريطة لاستخراج الإحداثيات والتحليل.
-              </div>
+              <div id="panel"></div>
             </div>
 
             <script>
-              const panel = document.getElementById("panel");
+              setTimeout(() => {
+                const s = document.getElementById("splash");
+                s.style.transition = "opacity .8s";
+                s.style.opacity = "0";
+                setTimeout(() => s.style.display = "none", 820);
+              }, 1500);
 
-              const targets = [
-                {id:"A1", lat:19.793522, lon:36.556198, group:"ANALOG", kind:"GPZ Hand-Pit Dark Regolith", score:92},
-                {id:"A2", lat:19.834457, lon:36.478347, group:"ANALOG", kind:"Loader Expansion Dark Regolith", score:88},
-                {id:"A3", lat:20.492444, lon:36.348738, group:"ANALOG", kind:"Dark Knoll / Pediment", score:84},
-                {id:"A4", lat:20.494440, lon:36.360965, group:"ANALOG", kind:"Hybrid Dark Regolith-Wadi Corridor", score:83},
-                {id:"A5", lat:19.547212, lon:36.280184, group:"ANALOG", kind:"Dark Pediment / Hill-Foot Strip", score:86},
-                {id:"A6", lat:21.075710, lon:36.341820, group:"ANALOG", kind:"Mountain Feeder / Wadi Interface", score:82},
-                {id:"TargetB", lat:20.780500, lon:36.450700, group:"TARGET", kind:"HOLD+ Landsat/ASTER candidate", score:70},
-                {id:"Z01", lat:20.802185, lon:36.380156, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:79},
-                {id:"Z02", lat:20.754163, lon:36.371198, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:78},
-                {id:"Z03", lat:20.904043, lon:36.449256, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:76},
-                {id:"R01", lat:19.999442, lon:37.015231, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:69},
-                {id:"R02", lat:19.998824, lon:36.960774, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:68},
-                {id:"R03", lat:19.898553, lon:36.735764, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:68}
+              const OWNER_NAME_AR = "المهندس أحمد أبوعزيزه الرشيدي";
+              const OWNER_NAME_EN = "Engineer Ahmed Abu Aziza Al-Rashidi";
+              const OWNER_EMAIL = "Abuaziza404@gmail.com";
+
+              const panel = document.getElementById("panel");
+              const modal = document.getElementById("modal");
+
+              const masterLaw = {
+                core: "Structure → Pattern → Alteration → Confirmation → Decision",
+                truth: [
+                  "لا تُعتمد الإحداثيات أو النسب الطيفية أو الأعماق أو الثقة كحقيقة نهائية إلا من ملف خام أو مصدر موثق أو معلومة ميدانية صريحة.",
+                  "Google Earth و PNG/JPEG/KMZ أدوات قراءة بصرية فقط وليست reflectance.",
+                  "الحفر يثبت النموذج لكنه ليس هدف البحث؛ الهدف هو الأرض التي تشبه مرحلة ما قبل الحفر.",
+                  "No Structure + No Pattern = Reject/HOLD منخفض.",
+                  "FeOx alone = Reject/HOLD.",
+                  "No Clay/SWIR = لا Target-B.",
+                  "GPZ-positive يرفع الحالة ميدانياً لكنه لا يساوي Assay.",
+                  "CONFIRMED يتطلب Assay + QA/QC."
+                ]
+              };
+
+              const proofLayers = [
+                {id:"L0", input:"Visual / KMZ / JPG", status:"Visual support", proof:"No"},
+                {id:"L1", input:"Raw bands / DEM", status:"Targeting / Field-check", proof:"No"},
+                {id:"L2", input:"GPZ signal log", status:"GPZ-POSITIVE", proof:"Field evidence only"},
+                {id:"L3", input:"Recovered visible gold", status:"Gold-present field evidence", proof:"Not economic alone"},
+                {id:"L4", input:"Assay + QA/QC", status:"Confirmed", proof:"Yes within limits"},
+                {id:"L5", input:"Continuity + engineering", status:"Economic model", proof:"Conditional"}
               ];
 
-              let saved = JSON.parse(localStorage.getItem("BOUH_SAVED_TARGETS") || "[]");
+              const gpzRules = [
+                {
+                  risk:"Magnetic_Ground_Risk > 0.75",
+                  ground:"Severe/Difficult",
+                  mode:"High Yield",
+                  sensitivity:"8-11",
+                  audio:"Low/On",
+                  strategy:"Slow swing, repeat ground balance"
+                },
+                {
+                  risk:"Magnetic_Ground_Risk < 0.45 + High Quartz QI",
+                  ground:"Normal",
+                  mode:"General/Deep",
+                  sensitivity:"12-16",
+                  audio:"Off",
+                  strategy:"Maximum depth in shallow bedrock pockets"
+                },
+                {
+                  risk:"Unknown",
+                  ground:"Difficult",
+                  mode:"High Yield / General test",
+                  sensitivity:"8-12",
+                  audio:"Low",
+                  strategy:"Start conservative then tune"
+                }
+              ];
+
+              const targets = [
+                {id:"ARB-T1", name:"Arbaat Top1 GPZ-Regolith practical range", lat:19.973186, lon:36.745590, decision:"FIELD-CHECK", status:"HOLD+", ipi:71.40, group:"ARBAAT"},
+                {id:"ARB-T2", name:"Arbaat Top2 GH/GV alteration cluster", lat:19.881313, lon:36.808758, decision:"FIELD-CHECK", status:"HOLD+", ipi:72.65, group:"ARBAAT"},
+                {id:"ARB-T3", name:"Arbaat Top3 structural jog feeder core", lat:19.983058, lon:36.776401, decision:"FIELD-CHECK", status:"HOLD", ipi:68.10, group:"ARBAAT"},
+                {id:"REG-P01", name:"Regional v4 P01", lat:20.669096, lon:36.428073, decision:"FIELD-CHECK", status:"HOLD", ipi:68.05, group:"REGIONAL"},
+                {id:"REG-P02", name:"Regional v4 P02", lat:20.927345, lon:36.490000, decision:"FIELD-CHECK", status:"HOLD", ipi:66.70, group:"REGIONAL"},
+                {id:"REG-P03", name:"Regional v4 P03", lat:19.788172, lon:37.023588, decision:"FIELD-CHECK", status:"HOLD", ipi:64.80, group:"REGIONAL"},
+                {id:"REG-P04", name:"Regional v4 P04", lat:20.745093, lon:36.438308, decision:"HOLD", status:"HOLD", ipi:60.80, group:"REGIONAL"},
+                {id:"REG-P05", name:"Regional v4 P05", lat:19.709376, lon:37.004529, decision:"FIELD-CHECK", status:"HOLD", ipi:63.45, group:"REGIONAL"},
+                {id:"A1", name:"GPZ Hand-Pit Dark Regolith", lat:19.793522, lon:36.556198, decision:"ANALOG", status:"FIELD-ANALOG", ipi:92.00, group:"ANALOG"},
+                {id:"A2", name:"Loader Expansion Dark Regolith", lat:19.834457, lon:36.478347, decision:"ANALOG", status:"FIELD-ANALOG", ipi:88.00, group:"ANALOG"},
+                {id:"A3", name:"Dark Knoll / Pediment", lat:20.492444, lon:36.348738, decision:"ANALOG", status:"FIELD-ANALOG", ipi:84.00, group:"ANALOG"},
+                {id:"TargetB", name:"HOLD+ Landsat/ASTER Candidate", lat:20.780500, lon:36.450700, decision:"HOLD+", status:"TARGET-B-CANDIDATE", ipi:70.00, group:"TARGET"}
+              ];
+
+              let saved = JSON.parse(localStorage.getItem("BOUH_V12_SAVED_TARGETS") || "[]");
               let lastTap = null;
               let gpsMarker = null;
+              let customLayers = [];
+              let currentPrediction = null;
+
+              function ymdOffset(days) {
+                const d = new Date(Date.now() + days * 86400000);
+                const y = d.getUTCFullYear();
+                const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+                const day = String(d.getUTCDate()).padStart(2, "0");
+                return `${y}-${m}-${day}`;
+              }
+
+              const gibsDate = ymdOffset(-2);
 
               const map = L.map("map", {
-                center:[19.793522,36.556198],
+                center:[19.973186,36.745590],
                 zoom:10,
                 zoomControl:true,
                 preferCanvas:true
               });
 
-              const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom:19,
-                attribution:"OSM"
-              });
+              const esriImagery = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                {maxZoom:19, attribution:"Esri World Imagery"}
+              );
 
-              const esriImagery = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-                maxZoom:19,
-                attribution:"Esri World Imagery"
-              });
+              const osm = L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {maxZoom:19, attribution:"OpenStreetMap"}
+              );
 
-              const esriTerrain = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}", {
-                maxZoom:13,
-                attribution:"Esri Terrain"
-              });
+              const openTopo = L.tileLayer(
+                "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+                {maxZoom:17, attribution:"OpenTopoMap"}
+              );
 
-              const esriHillshade = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", {
-                maxZoom:13,
-                opacity:0.65,
-                attribution:"Esri Hillshade"
-              });
+              const esriTerrain = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
+                {maxZoom:13, attribution:"Esri Terrain"}
+              );
 
-              const openTopo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-                maxZoom:17,
-                attribution:"OpenTopoMap"
-              });
+              const hillshade = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",
+                {maxZoom:13, opacity:.62, attribution:"Esri Hillshade"}
+              );
 
-              const gibsVIIRS = L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg", {
-                maxZoom:9,
-                attribution:"NASA GIBS VIIRS",
-                opacity:0.90
-              });
+              const nasaVIIRS = L.tileLayer(
+                `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+                {maxZoom:9, opacity:.92, attribution:"NASA GIBS VIIRS"}
+              );
 
-              const gibsMODIS = L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg", {
-                maxZoom:9,
-                attribution:"NASA GIBS MODIS",
-                opacity:0.90
-              });
-
-              esriImagery.addTo(map);
+              const nasaMODIS = L.tileLayer(
+                `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+                {maxZoom:9, opacity:.92, attribution:"NASA GIBS MODIS"}
+              );
 
               const targetLayer = L.layerGroup().addTo(map);
               const savedLayer = L.layerGroup().addTo(map);
               const analysisLayer = L.layerGroup().addTo(map);
+              const proofLayer = L.layerGroup();
+
+              esriImagery.addTo(map);
 
               const baseLayers = {
                 "Satellite | Esri World Imagery": esriImagery,
-                "Street | OpenStreetMap": osm,
-                "Terrain | Esri Terrain": esriTerrain,
+                "Street | OSM": osm,
                 "Topo | OpenTopoMap": openTopo,
-                "NASA VIIRS True Color": gibsVIIRS,
-                "NASA MODIS True Color": gibsMODIS
+                "Terrain | Esri Terrain": esriTerrain,
+                "NASA VIIRS True Color": nasaVIIRS,
+                "NASA MODIS True Color": nasaMODIS
               };
 
               const overlays = {
-                "Hillshade Overlay": esriHillshade,
-                "BOUH Targets": targetLayer,
-                "Saved Targets": savedLayer,
-                "Analysis Lines": analysisLayer
+                "Hillshade Overlay": hillshade,
+                "BOUH Target Register": targetLayer,
+                "Saved Field Points": savedLayer,
+                "Analysis Overlay": analysisLayer,
+                "Proof / Confidence Overlay": proofLayer
               };
 
-              L.control.layers(baseLayers, overlays, {collapsed:true}).addTo(map);
+              const layerControl = L.control.layers(baseLayers, overlays, {collapsed:true}).addTo(map);
               L.control.scale({imperial:false}).addTo(map);
 
-              function iconColor(t) {
+              function markerColor(t) {
                 if (t.group === "ANALOG") return "#d4af37";
+                if (t.group === "ARBAAT") return "#50e28a";
                 if (t.group === "TARGET") return "#ff5c5c";
-                if (t.group === "CANDIDATE") return "#00e5ff";
-                if (t.group === "USER") return "#5cff98";
+                if (t.group === "USER") return "#00e5ff";
                 return "#ffffff";
               }
 
-              function markerHtml(color) {
-                return `<div style="
-                  width:18px;height:18px;border-radius:50%;
-                  background:${color};
-                  border:2px solid #05070a;
-                  box-shadow:0 0 14px ${color};
-                "></div>`;
+              function markerIcon(color) {
+                return L.divIcon({
+                  html:`<div style="
+                    width:20px;height:20px;border-radius:50%;
+                    background:${color};
+                    border:2px solid #05070a;
+                    box-shadow:0 0 14px ${color};
+                  "></div>`,
+                  className:"",
+                  iconSize:[20,20],
+                  iconAnchor:[10,10]
+                });
               }
 
-              function addMarker(t, layer) {
-                const m = L.marker([t.lat,t.lon], {
-                  icon:L.divIcon({
-                    html:markerHtml(iconColor(t)),
-                    className:"",
-                    iconSize:[18,18],
-                    iconAnchor:[9,9]
-                  })
-                });
-
+              function addTargetMarker(t, layer) {
+                const m = L.marker([t.lat,t.lon], {icon:markerIcon(markerColor(t))});
                 m.bindPopup(`
                   <b>${t.id}</b><br>
-                  ${t.kind}<br>
+                  ${t.name}<br>
                   Group: ${t.group}<br>
-                  Score: ${t.score}%<br>
-                  Lat: ${t.lat.toFixed(6)}<br>
-                  Lon: ${t.lon.toFixed(6)}
+                  Status: ${t.status}<br>
+                  IPI: ${Number(t.ipi).toFixed(2)}%<br>
+                  Decision: ${t.decision}<br>
+                  Lat: ${Number(t.lat).toFixed(6)}<br>
+                  Lon: ${Number(t.lon).toFixed(6)}
                 `);
-
                 m.addTo(layer);
               }
 
               function refreshMarkers() {
                 targetLayer.clearLayers();
                 savedLayer.clearLayers();
-                targets.forEach(t => addMarker(t, targetLayer));
-                saved.forEach(t => addMarker(t, savedLayer));
+
+                for (const t of targets) addTargetMarker(t, targetLayer);
+                for (const t of saved) addTargetMarker(t, savedLayer);
               }
 
               refreshMarkers();
@@ -628,165 +932,572 @@ jobs:
                 return R*2*Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
               }
 
-              function nearest(lat,lon) {
+              function nearestTarget(lat,lon) {
                 let best=targets[0], bd=999999;
                 for (const t of targets) {
                   const d=distanceKm(lat,lon,t.lat,t.lon);
-                  if (d<bd) { bd=d; best=t; }
+                  if (d<bd) {
+                    bd=d;
+                    best=t;
+                  }
                 }
                 return {target:best, dist:bd};
               }
 
-              function predict(lat,lon) {
-                const n = nearest(lat,lon);
+              function syntheticIndices(lat, lon) {
+                const n = nearestTarget(lat, lon);
                 const d = n.dist;
 
-                let structure = d < 5 ? 65 : d < 12 ? 35 : 10;
-                let alteration = n.target.group === "TARGET" || n.target.group === "CANDIDATE" ? 60 : 35;
-                let placer = d < 3 ? 55 : d < 8 ? 35 : 15;
-                let field = n.target.group === "ANALOG" && d < 5 ? 80 : 20;
+                let iron = 0.45 + Math.max(0, 0.50 - d*0.035);
+                let clay = 0.35 + Math.max(0, 0.44 - d*0.030);
+                let silica = 0.40 + Math.max(0, 0.50 - d*0.028);
+                let structure = 0.30 + Math.max(0, 0.60 - d*0.040);
+                let pattern = 0.25 + Math.max(0, 0.45 - d*0.030);
 
-                const score = Math.max(0, Math.min(100,
-                  0.34*structure + 0.30*alteration + 0.20*placer + 0.16*field
-                ));
+                if (n.target.group === "ANALOG") {
+                  iron += .10;
+                  pattern += .12;
+                }
 
-                let cls="LOW", decision="OBSERVE ONLY";
-                if (score >= 85) { cls="S-TIER VEIN / SUPERGENE"; decision="FIELD PRIORITY 1"; }
-                else if (score >= 70) { cls="HIGH CANDIDATE"; decision="FIELD CHECK + SAMPLE"; }
-                else if (score >= 55) { cls="HOLD"; decision="FAST CHECK ONLY"; }
+                if (n.target.group === "ARBAAT") {
+                  structure += .12;
+                  clay += .08;
+                }
 
-                return {nearest:n.target, dist:d, structure, alteration, placer, field, score, cls, decision};
+                iron = clamp01(iron);
+                clay = clamp01(clay);
+                silica = clamp01(silica);
+                structure = clamp01(structure);
+                pattern = clamp01(pattern);
+
+                return {
+                  iron, clay, silica, structure, pattern,
+                  source:"BOUH registered targets + rule-based spatial model",
+                  nearest:n
+                };
               }
 
-              function drawAnalysis(lat,lon,p) {
+              function predict(lat,lon, field={}) {
+                const idx = syntheticIndices(lat, lon);
+                const n = idx.nearest;
+                const d = n.dist;
+
+                let S = 100 * idx.structure;
+                let A = 100 * (0.34*idx.iron + 0.33*idx.clay + 0.33*idx.silica);
+                let P = 100 * idx.pattern;
+                let F = 0;
+
+                if (n.target.group === "ANALOG" && d <= 5) F += 65;
+                if (n.target.group === "ARBAAT" && d <= 5) F += 35;
+                if (field.gpz) F += 35;
+                if (field.oldWork) F += 20;
+                if (field.visibleQuartz) A += 15;
+                if (field.gossan) A += 15;
+                if (field.wadiTrap) P += 12;
+
+                S = clamp(S);
+                A = clamp(A);
+                P = clamp(P);
+                F = clamp(F);
+
+                let magneticRisk = clamp(35 + idx.iron*35 - idx.silica*12);
+                let IPI = clamp(0.35*S + 0.30*A + 0.20*P + 0.15*F - 0.10*magneticRisk);
+
+                let gates = [];
+                let proof = "L1 Targeting/FIELD-CHECK";
+
+                const hasStructure = S >= 45;
+                const hasPattern = P >= 40;
+                const hasAlteration = A >= 45;
+                const hasField = F >= 40;
+
+                if (!hasStructure && !hasPattern) {
+                  IPI = Math.min(IPI, 35);
+                  gates.push("KILL/HOLD: No Structure + No Pattern");
+                }
+
+                if (!hasAlteration && !hasField) {
+                  IPI = Math.min(IPI, 54);
+                  gates.push("HOLD: No Clay/SWIR or Field evidence");
+                }
+
+                if (idx.iron > .75 && idx.clay < .45 && idx.silica < .45) {
+                  IPI = Math.min(IPI, 55);
+                  gates.push("FeOx alone risk: laterite/barite/noise");
+                }
+
+                if (field.gpz) proof = "L2 GPZ-POSITIVE field evidence only";
+                if (field.visibleGold) proof = "L3 Gold-present field evidence";
+                if (field.assay) proof = "L4 Confirmed within assay/QAQC limits";
+
+                let cls = "LOW";
+                let decision = "OBSERVE ONLY";
+
+                if (IPI >= 85 && hasStructure && hasAlteration) {
+                  cls = "S-TIER / VEIN-SUPERGENE";
+                  decision = "FIELD PRIORITY 1";
+                } else if (IPI >= 70) {
+                  cls = "HIGH CANDIDATE";
+                  decision = "FIELD-CHECK + SAMPLE";
+                } else if (IPI >= 55) {
+                  cls = "HOLD";
+                  decision = "FAST CHECK ONLY";
+                } else if (IPI <= 35) {
+                  cls = "REJECT / LOW HOLD";
+                  decision = "DO NOT DIG";
+                }
+
+                const gpz = gpzAdvice(magneticRisk, idx.silica);
+
+                return {
+                  lat, lon, nearest:n.target, dist:d,
+                  iron:idx.iron, clay:idx.clay, silica:idx.silica,
+                  structure:idx.structure, pattern:idx.pattern,
+                  S,A,P,F, magneticRisk, IPI, cls, decision, gates, proof, gpz,
+                  source:idx.source
+                };
+              }
+
+              function gpzAdvice(risk, silica) {
+                if (risk > 75) {
+                  return {
+                    ground:"Severe/Difficult",
+                    mode:"High Yield",
+                    sensitivity:"8-11",
+                    audio:"Low/On",
+                    strategy:"Slow swing, repeat ground balance"
+                  };
+                }
+
+                if (risk < 45 && silica > .70) {
+                  return {
+                    ground:"Normal",
+                    mode:"General/Deep",
+                    sensitivity:"12-16",
+                    audio:"Off",
+                    strategy:"Maximum depth in shallow bedrock pockets"
+                  };
+                }
+
+                return {
+                  ground:"Difficult",
+                  mode:"High Yield / General test",
+                  sensitivity:"8-12",
+                  audio:"Low",
+                  strategy:"Start conservative then tune"
+                };
+              }
+
+              function clamp(v) { return Math.max(0, Math.min(100, v)); }
+              function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+              function drawPrediction(p) {
                 analysisLayer.clearLayers();
 
-                L.circle([lat,lon], {
-                  radius: p.score >= 70 ? 700 : 350,
-                  color: p.score >= 70 ? "#ff5c5c" : "#00e5ff",
+                const color = p.IPI >= 70 ? "#ff5c5c" : p.IPI >= 55 ? "#d4af37" : "#00e5ff";
+
+                L.circle([p.lat,p.lon], {
+                  radius:p.IPI >= 70 ? 900 : 450,
+                  color,
                   weight:2,
-                  fillOpacity:0.10
+                  fillOpacity:.10
                 }).addTo(analysisLayer);
 
-                L.polyline([[lat,lon],[p.nearest.lat,p.nearest.lon]], {
+                L.polyline([[p.lat,p.lon],[p.nearest.lat,p.nearest.lon]], {
                   color:"#d4af37",
                   weight:2,
-                  dashArray:"6,6"
+                  dashArray:"7,7"
                 }).addTo(analysisLayer);
 
-                if (p.score >= 80) {
+                if (p.IPI >= 80 && p.structure >= .55 && p.silica >= .65) {
                   L.polyline([
-                    [lat-0.010, lon-0.012],
-                    [lat, lon],
-                    [lat+0.012, lon+0.014]
+                    [p.lat - .012, p.lon - .014],
+                    [p.lat, p.lon],
+                    [p.lat + .014, p.lon + .016]
                   ], {
-                    color:"#ff2d2d",
+                    color:"#ff2424",
                     weight:5
                   }).bindPopup("Quartz-Gold Veins (High Potential)").addTo(analysisLayer);
                 }
+
+                renderProofOverlay(p);
+              }
+
+              function renderProofOverlay(p) {
+                proofLayer.clearLayers();
+
+                L.circle([p.lat,p.lon], {
+                  radius:1600,
+                  color:"#50e28a",
+                  weight:1,
+                  fillOpacity:.04
+                }).addTo(proofLayer);
+
+                L.circle([p.nearest.lat,p.nearest.lon], {
+                  radius:900,
+                  color:"#d4af37",
+                  weight:1,
+                  fillOpacity:.06
+                }).addTo(proofLayer);
               }
 
               map.on("click", e => {
                 lastTap = e.latlng;
-                const p = predict(e.latlng.lat, e.latlng.lng);
-                drawAnalysis(e.latlng.lat, e.latlng.lng, p);
+                currentPrediction = predict(e.latlng.lat, e.latlng.lng);
+                drawPrediction(currentPrediction);
+                showPrediction(currentPrediction);
+              });
+
+              function showPrediction(p) {
+                const gates = p.gates.length ? p.gates.map(x=>`<span class="red">• ${x}</span>`).join("<br>") : `<span class="green">لم يتم تفعيل بوابات رفض صارمة.</span>`;
 
                 panel.innerHTML = `
-                  <span class="gold">CLICK COORDINATES</span><br>
-                  LAT=${e.latlng.lat.toFixed(6)}<br>
-                  LON=${e.latlng.lng.toFixed(6)}<br><br>
+                  <div class="card">
+                    <span class="gold">تحليل فوري للنقطة المختارة</span><br>
+                    LAT=${p.lat.toFixed(6)} | LON=${p.lon.toFixed(6)}<br>
+                    NEAREST=${p.nearest.id} / ${p.nearest.name}<br>
+                    DIST_KM=${p.dist.toFixed(2)}
+                  </div>
 
-                  <span class="cyan">NEAREST TARGET</span><br>
-                  ID=${p.nearest.id}<br>
-                  KIND=${p.nearest.kind}<br>
-                  DIST_KM=${p.dist.toFixed(2)}<br><br>
+                  <div class="grid3">
+                    <div class="metric">IPI<b>${p.IPI.toFixed(1)}</b></div>
+                    <div class="metric">S<b>${p.S.toFixed(0)}</b></div>
+                    <div class="metric">A<b>${p.A.toFixed(0)}</b></div>
+                  </div>
 
-                  <span class="green">PREDICTION</span><br>
-                  SCORE=${p.score.toFixed(2)}%<br>
-                  CLASS=${p.cls}<br>
-                  DECISION=${p.decision}<br><br>
+                  <div class="card">
+                    <span class="green">CLASS:</span> ${p.cls}<br>
+                    <span class="green">DECISION:</span> ${p.decision}<br>
+                    <span class="cyan">PROOF:</span> ${p.proof}
+                  </div>
 
-                  S=${p.structure.toFixed(2)} |
-                  A=${p.alteration.toFixed(2)} |
-                  P=${p.placer.toFixed(2)} |
-                  F=${p.field.toFixed(2)}<br><br>
+                  <div class="grid2">
+                    <div class="metric">Iron / FeOx<b>${p.iron.toFixed(3)}</b></div>
+                    <div class="metric">Clay / SWIR<b>${p.clay.toFixed(3)}</b></div>
+                    <div class="metric">Silica / Quartz<b>${p.silica.toFixed(3)}</b></div>
+                    <div class="metric">Mag Risk<b>${p.magneticRisk.toFixed(0)}</b></div>
+                  </div>
 
-                  <span class="red">تنبيه:</span>
-                  هذه أولوية استهداف، وليست تأكيداً لوجود الذهب.
+                  <div class="card">
+                    <span class="gold">مصفوفة القتل والبوابات الصارمة</span><br>
+                    ${gates}
+                  </div>
+
+                  <div class="card">
+                    <span class="cyan">GPZ Strategy</span><br>
+                    Ground=${p.gpz.ground}<br>
+                    Gold Mode=${p.gpz.mode}<br>
+                    Sensitivity=${p.gpz.sensitivity}<br>
+                    Audio=${p.gpz.audio}<br>
+                    Strategy=${p.gpz.strategy}
+                  </div>
+
+                  <div class="card">
+                    <span class="muted">تنبيه علمي:</span>
+                    هذه أولوية استهداف وليست إثبات ذهب اقتصادي. الإثبات الاقتصادي يتطلب Assay + QA/QC.
+                  </div>
                 `;
-              });
+              }
 
               function goGPS() {
                 if (window.BOUH) {
                   BOUH.requestGPS();
                 } else if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition(pos => {
-                    setNativeGPS(pos.coords.latitude, pos.coords.longitude);
+                    window.setNativeGPS(pos.coords.latitude, pos.coords.longitude);
                   });
                 }
               }
 
-              window.setNativeGPS = function(lat,lon) {
+              window.setNativeGPS = function(lat, lon) {
                 if (gpsMarker) map.removeLayer(gpsMarker);
 
                 gpsMarker = L.marker([lat,lon], {
                   icon:L.divIcon({
-                    html:`<div style="width:22px;height:22px;border-radius:50%;background:#00e5ff;border:3px solid #05070a;box-shadow:0 0 18px #00e5ff"></div>`,
+                    html:`<div style="
+                      width:24px;height:24px;border-radius:50%;
+                      background:#00e5ff;
+                      border:3px solid #05070a;
+                      box-shadow:0 0 20px #00e5ff;
+                    "></div>`,
                     className:"",
-                    iconSize:[22,22],
-                    iconAnchor:[11,11]
+                    iconSize:[24,24],
+                    iconAnchor:[12,12]
                   })
-                }).bindPopup(`GPS<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+                }).addTo(map);
 
+                gpsMarker.bindPopup(`GPS<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`);
                 map.setView([lat,lon], 15);
 
                 panel.innerHTML = `
-                  <span class="cyan">GPS LOCK</span><br>
-                  LAT=${lat.toFixed(6)}<br>
-                  LON=${lon.toFixed(6)}
+                  <div class="card">
+                    <span class="cyan">GPS LOCK</span><br>
+                    LAT=${lat.toFixed(6)}<br>
+                    LON=${lon.toFixed(6)}
+                  </div>
                 `;
-              }
+              };
 
-              function addManualTarget() {
-                if (!lastTap) {
-                  panel.innerHTML = `<span class="red">اضغط على الخريطة أولاً ثم احفظ النقطة.</span>`;
+              function saveCurrent() {
+                if (!lastTap || !currentPrediction) {
+                  panel.innerHTML = `<div class="card"><span class="red">اضغط على الخريطة أولاً ثم احفظ النقطة.</span></div>`;
                   return;
                 }
 
-                const p = predict(lastTap.lat, lastTap.lng);
+                const p = currentPrediction;
+
                 const t = {
                   id:"U" + Date.now(),
-                  lat:lastTap.lat,
-                  lon:lastTap.lng,
+                  name:p.cls,
+                  lat:p.lat,
+                  lon:p.lon,
+                  decision:p.decision,
+                  status:p.proof,
+                  ipi:Number(p.IPI.toFixed(2)),
                   group:"USER",
-                  kind:p.cls,
-                  score:Number(p.score.toFixed(2)),
-                  note:p.decision
+                  note:`Nearest=${p.nearest.id}; ${p.decision}; ${p.proof}`
                 };
 
                 saved.unshift(t);
-                localStorage.setItem("BOUH_SAVED_TARGETS", JSON.stringify(saved));
+                localStorage.setItem("BOUH_V12_SAVED_TARGETS", JSON.stringify(saved));
                 refreshMarkers();
 
                 panel.innerHTML = `
-                  <span class="green">تم حفظ النقطة</span><br>
-                  ${t.id}<br>
-                  LAT=${t.lat.toFixed(6)}<br>
-                  LON=${t.lon.toFixed(6)}<br>
-                  SCORE=${t.score}%
+                  <div class="card">
+                    <span class="green">تم حفظ الهدف</span><br>
+                    ${t.id}<br>
+                    LAT=${t.lat.toFixed(6)}<br>
+                    LON=${t.lon.toFixed(6)}<br>
+                    IPI=${t.ipi}%
+                  </div>
+                `;
+              }
+
+              function openModal(type) {
+                modal.style.display = "block";
+
+                if (type === "settings") renderSettings();
+                else if (type === "ai") renderAI();
+                else if (type === "proof") renderProof();
+                else if (type === "data") renderData();
+              }
+
+              function closeModal() {
+                modal.style.display = "none";
+              }
+
+              function renderSettings() {
+                modal.innerHTML = `
+                  <div class="gold" style="font-size:18px">إعدادات الطبقات والربط المتقدم</div>
+                  <div class="card">
+                    <span class="cyan">Data Path</span><br>
+                    <span id="dataPath">جار القراءة...</span>
+                  </div>
+
+                  <div class="card">
+                    <span class="gold">رابط XYZ مخصص</span><br>
+                    <span class="muted">ضع رابط Sentinel Hub / Planet / Maxar / Tile Server بصيغة {z}/{x}/{y}</span>
+                    <textarea id="xyzUrl" placeholder="https://server/tiles/{z}/{x}/{y}.png"></textarea>
+                    <input id="xyzName" placeholder="Layer name" value="Custom Satellite Layer"/>
+                    <button onclick="addCustomLayer()">إضافة الطبقة</button>
+                  </div>
+
+                  <div class="card">
+                    <span class="gold">معلومات التطبيق</span><br>
+                    App: BOUH Terrain V12 Supreme Real GeoAI<br>
+                    Developer: ${OWNER_NAME_EN}<br>
+                    Email: ${OWNER_EMAIL}<br>
+                    Package: com.abuaziza.bouhgoldpro
+                  </div>
+
+                  <button class="red" onclick="closeModal()">إغلاق</button>
+                `;
+
+                if (window.BOUH) {
+                  document.getElementById("dataPath").textContent = BOUH.getDataPath();
+                } else {
+                  document.getElementById("dataPath").textContent = "Android bridge unavailable";
+                }
+              }
+
+              function addCustomLayer() {
+                const url = document.getElementById("xyzUrl").value.trim();
+                const name = document.getElementById("xyzName").value.trim() || "Custom Layer";
+                if (!url) return;
+
+                try {
+                  const layer = L.tileLayer(url, {
+                    maxZoom:22,
+                    attribution:name
+                  }).addTo(map);
+
+                  customLayers.push(layer);
+                  layerControl.addOverlay(layer, name);
+
+                  panel.innerHTML = `<div class="card"><span class="green">تمت إضافة الطبقة:</span><br>${name}<br>${url}</div>`;
+                  closeModal();
+                } catch(e) {
+                  panel.innerHTML = `<div class="card"><span class="red">فشل إضافة الطبقة.</span></div>`;
+                }
+              }
+
+              function renderAI() {
+                modal.innerHTML = `
+                  <div class="gold" style="font-size:18px">GeoAI Offline Expert Engine</div>
+                  <div class="muted">يعمل بدون إنترنت كنظام قواعد مستمد من منظومة بوح: Structure → Pattern → Alteration → Confirmation → Decision.</div>
+
+                  <textarea id="aiText" placeholder="اكتب وصف الأرض: كوارتز، جوسان، طين أحمر، فالق، وادي، إشارة GPZ، حفر قديم..."></textarea>
+
+                  <div class="grid2">
+                    <button onclick="runAI()">تحليل الوصف</button>
+                    <button class="red" onclick="closeModal()">إغلاق</button>
+                  </div>
+
+                  <div id="aiResult" class="card">جاهز.</div>
+                `;
+              }
+
+              function runAI() {
+                const s = document.getElementById("aiText").value.toLowerCase();
+
+                const quartz = has(s, ["كوارتز","مرو","quartz","silica"]) ? 1 : 0;
+                const gossan = has(s, ["جوسان","حديد","هيماتيت","iron","gossan","hematite","limonite"]) ? 1 : 0;
+                const clay = has(s, ["طين","أرجلك","كاولين","clay","argillic","kaolinite","swir"]) ? 1 : 0;
+                const structure = has(s, ["فالق","كسر","قص","shear","fault","lineament","structure"]) ? 1 : 0;
+                const pattern = has(s, ["وادي","شعب","مصيدة","slope","wadi","trap","drainage"]) ? 1 : 0;
+                const gpz = has(s, ["gpz","zvt","إشارة","اشارة","signal"]) ? 1 : 0;
+                const old = has(s, ["لودر","حفر","قديم","pits","old","loader"]) ? 1 : 0;
+                const visible = has(s, ["ذهب مرئي","visible gold","حبة ذهب"]) ? 1 : 0;
+                const assay = has(s, ["assay","تحليل مخبري","qa/qc","qaqc"]) ? 1 : 0;
+
+                let S = structure ? 80 : 0;
+                let A = quartz*25 + gossan*25 + clay*25;
+                let P = pattern ? 65 : 10;
+                let F = gpz*35 + old*20 + visible*45 + assay*60;
+
+                S = clamp(S); A = clamp(A); P = clamp(P); F = clamp(F);
+
+                let IPI = clamp(.35*S + .30*A + .20*P + .15*F);
+
+                let gates = [];
+                if (!structure && !pattern) {
+                  IPI = Math.min(IPI, 35);
+                  gates.push("No Structure + No Pattern = Reject/HOLD low");
+                }
+
+                if (!clay && !gpz && !visible && !assay) {
+                  IPI = Math.min(IPI, 54);
+                  gates.push("No Clay/SWIR and no field evidence = no Target-B");
+                }
+
+                if (gossan && !quartz && !clay && !structure) {
+                  IPI = Math.min(IPI, 55);
+                  gates.push("FeOx alone = Reject/HOLD risk");
+                }
+
+                let proof = "L1 Targeting/FIELD-CHECK";
+                if (gpz) proof = "L2 GPZ-POSITIVE field evidence only";
+                if (visible) proof = "L3 Gold-present field evidence";
+                if (assay) proof = "L4 Confirmed within QA/QC limits";
+
+                let decision = "OBSERVE ONLY";
+                if (IPI >= 85) decision = "FIELD PRIORITY 1";
+                else if (IPI >= 70) decision = "FIELD-CHECK + SAMPLE";
+                else if (IPI >= 55) decision = "HOLD / FAST CHECK";
+                else if (IPI <= 35) decision = "DO NOT DIG";
+
+                document.getElementById("aiResult").innerHTML = `
+                  <span class="gold">AI_RESULT</span><br>
+                  IPI=${IPI.toFixed(1)}%<br>
+                  S=${S.toFixed(0)} | A=${A.toFixed(0)} | P=${P.toFixed(0)} | F=${F.toFixed(0)}<br>
+                  Decision=${decision}<br>
+                  Proof=${proof}<br><br>
+                  ${gates.length ? gates.map(x=>`<span class="red">• ${x}</span>`).join("<br>") : `<span class="green">No hard rejection gate triggered.</span>`}
+                `;
+              }
+
+              function has(s, arr) {
+                return arr.some(x => s.includes(String(x).toLowerCase()));
+              }
+
+              function renderProof() {
+                let rows = proofLayers.map(x => `
+                  <tr>
+                    <td>${x.id}</td>
+                    <td>${x.input}</td>
+                    <td>${x.status}</td>
+                    <td>${x.proof}</td>
+                  </tr>
+                `).join("");
+
+                modal.innerHTML = `
+                  <div class="gold" style="font-size:18px">Gold Proof Engine v2</div>
+                  <div class="card">
+                    وظيفة المحرك: فصل التوقع الاستكشافي عن الإثبات الميداني والإثبات الاقتصادي.
+                  </div>
+
+                  <table style="width:100%;border-collapse:collapse;font-size:11px;direction:ltr;text-align:left">
+                    <tr style="color:#d4af37">
+                      <th>Layer</th><th>Input</th><th>Status</th><th>Proof</th>
+                    </tr>
+                    ${rows}
+                  </table>
+
+                  <div class="card">
+                    <span class="gold">قواعد صارمة</span><br>
+                    ${masterLaw.truth.map(x=>`• ${x}`).join("<br>")}
+                  </div>
+
+                  <button class="red" onclick="closeModal()">إغلاق</button>
+                `;
+              }
+
+              function renderData() {
+                const rows = targets.map(t => `
+                  <tr>
+                    <td>${t.id}</td>
+                    <td>${t.lat.toFixed(6)}</td>
+                    <td>${t.lon.toFixed(6)}</td>
+                    <td>${t.status}</td>
+                    <td>${t.ipi.toFixed(2)}</td>
+                  </tr>
+                `).join("");
+
+                modal.innerHTML = `
+                  <div class="gold" style="font-size:18px">Target Register + RAW Control Center</div>
+
+                  <div class="card">
+                    Core Engine: ${masterLaw.core}<br>
+                    Targets: ${targets.length}<br>
+                    Saved: ${saved.length}<br>
+                    Developer: ${OWNER_NAME_AR}<br>
+                    Email: ${OWNER_EMAIL}
+                  </div>
+
+                  <table style="width:100%;border-collapse:collapse;font-size:11px;direction:ltr;text-align:left">
+                    <tr style="color:#d4af37">
+                      <th>ID</th><th>Lat</th><th>Lon</th><th>Status</th><th>IPI</th>
+                    </tr>
+                    ${rows}
+                  </table>
+
+                  <button class="red" onclick="closeModal()">إغلاق</button>
                 `;
               }
 
               function buildKML() {
                 let kml = `<?xml version="1.0" encoding="UTF-8"?>`;
                 kml += `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
-                kml += `<name>BOUH V11 Saved Targets</name>`;
+                kml += `<name>BOUH Terrain V12 Saved Targets</name>`;
 
                 for (const t of saved) {
                   kml += `<Placemark>`;
-                  kml += `<name>${t.id} ${t.score}%</name>`;
-                  kml += `<description><![CDATA[${t.kind}<br>${t.note}]]></description>`;
-                  kml += `<Point><coordinates>${t.lon.toFixed(6)},${t.lat.toFixed(6)},0</coordinates></Point>`;
+                  kml += `<name>${escapeXml(t.id)} ${Number(t.ipi).toFixed(2)}%</name>`;
+                  kml += `<description><![CDATA[`;
+                  kml += `Name=${t.name}<br>Status=${t.status}<br>Decision=${t.decision}<br>Note=${t.note || ""}<br>`;
+                  kml += `Developer=${OWNER_NAME_EN}<br>Email=${OWNER_EMAIL}`;
+                  kml += `]]></description>`;
+                  kml += `<Point><coordinates>${Number(t.lon).toFixed(6)},${Number(t.lat).toFixed(6)},0</coordinates></Point>`;
                   kml += `</Placemark>`;
                 }
 
@@ -796,40 +1507,53 @@ jobs:
 
               function exportKML() {
                 const kml = buildKML();
-                if (window.BOUH) BOUH.saveKML("bouh_v11_targets.kml", kml);
-                else console.log(kml);
-              }
-
-              function toggleSettings() {
-                const s = document.getElementById("settings");
-                s.style.display = s.style.display === "block" ? "none" : "block";
-              }
-
-              function addCustomLayer() {
-                const url = document.getElementById("customUrl").value.trim();
-                if (!url) return;
-
-                try {
-                  const custom = L.tileLayer(url, {
-                    maxZoom:22,
-                    attribution:"Custom XYZ"
-                  }).addTo(map);
-
-                  panel.innerHTML = `<span class="green">تمت إضافة الطبقة المخصصة.</span><br>${url}`;
-                  toggleSettings();
-                } catch(e) {
-                  panel.innerHTML = `<span class="red">فشل إضافة الطبقة.</span>`;
+                if (window.BOUH) {
+                  BOUH.saveKML("bouh_v12_supreme_targets.kml", kml);
+                } else {
+                  console.log(kml);
+                  panel.innerHTML = `<div class="card"><span class="green">KML printed to console.</span></div>`;
                 }
               }
 
+              function sendReport() {
+                const body = `
+BOUH Terrain V12 Field Report
+Developer: ${OWNER_NAME_EN}
+Email: ${OWNER_EMAIL}
+
+Last prediction:
+${currentPrediction ? JSON.stringify(currentPrediction, null, 2) : "No prediction yet"}
+
+Saved targets:
+${JSON.stringify(saved, null, 2)}
+                `;
+
+                if (window.BOUH) {
+                  BOUH.sendEmailReport("BOUH V12 Field Report", body);
+                } else {
+                  console.log(body);
+                }
+              }
+
+              function escapeXml(s) {
+                return String(s || "")
+                  .replace(/&/g,"&amp;")
+                  .replace(/</g,"&lt;")
+                  .replace(/>/g,"&gt;");
+              }
+
               panel.innerHTML = `
-                <span class="gold">BOUH V11 REAL MAPS READY</span><br>
-                اختر من زر الطبقات أعلى الخريطة:<br>
-                Satellite | Esri World Imagery<br>
-                Terrain | Esri Terrain<br>
-                Topo | OpenTopoMap<br>
-                NASA VIIRS / MODIS<br><br>
-                اضغط على أي موقع للتحليل.
+                <div class="card">
+                  <span class="gold">BOUH V12 SUPREME REAL GEOAI READY</span><br>
+                  خرائط حقيقية Online: Esri Satellite, Terrain, OSM, OpenTopoMap, NASA GIBS.<br>
+                  اضغط على الخريطة لإجراء تحليل فوري.
+                </div>
+
+                <div class="card">
+                  <span class="cyan">Developer</span><br>
+                  ${OWNER_NAME_AR}<br>
+                  ${OWNER_EMAIL}
+                </div>
               `;
             </script>
           </body>
@@ -841,21 +1565,27 @@ jobs:
           cd android_app
           gradle wrapper --gradle-version 8.10.2
 
-      - name: Build APK
+      - name: Build Debug and Release APK
         run: |
           cd android_app
           chmod +x gradlew
           ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Collect APK
+      - name: Collect APK Files
         run: |
           mkdir -p output
-          cp android_app/app/build/outputs/apk/debug/app-debug.apk output/BOUH-TERRAIN-V11-REAL-MAPS-debug.apk
+          cp android_app/app/build/outputs/apk/debug/app-debug.apk output/BOUH-TERRAIN-V12-SUPREME-REAL-GEOAI-debug.apk
+
+          if [ -f android_app/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp android_app/app/build/outputs/apk/release/app-release-unsigned.apk output/BOUH-TERRAIN-V12-SUPREME-REAL-GEOAI-release-unsigned.apk
+          fi
+
           ls -lah output
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BOUH-TERRAIN-V11-REAL-MAPS-APK
-          path: output/BOUH-TERRAIN-V11-REAL-MAPS-debug.apk
+          name: BOUH-TERRAIN-V12-SUPREME-REAL-GEOAI-APK
+          path: output/*.apk
           retention-days: 30
