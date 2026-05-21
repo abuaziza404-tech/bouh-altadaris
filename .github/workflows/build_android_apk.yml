@@ -1,4 +1,4 @@
-name: ONE CLICK BUILD APK - BOUH V10 PRO
+name: ONE CLICK BUILD APK - BOUH REAL MAPS V11
 
 on:
   workflow_dispatch:
@@ -34,11 +34,12 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Create BOUH Terrain V10 Pro Android Project
+      - name: Create BOUH Real Maps Android Project
         run: |
           rm -rf android_app
           mkdir -p android_app/app/src/main/java/com/abuaziza/bouhgoldpro
           mkdir -p android_app/app/src/main/res/values
+          mkdir -p android_app/app/src/main/assets
 
           cat > android_app/settings.gradle <<'EOF'
           pluginManagement {
@@ -48,7 +49,7 @@ jobs:
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
               repositories { google(); mavenCentral() }
           }
-          rootProject.name = "BOUHTerrainV10Pro"
+          rootProject.name = "BOUHTerrainRealMapsV11"
           include ":app"
           EOF
 
@@ -71,8 +72,8 @@ jobs:
                   applicationId "com.abuaziza.bouhgoldpro"
                   minSdk 23
                   targetSdk 35
-                  versionCode 1000
-                  versionName "10.0.0"
+                  versionCode 1100
+                  versionName "11.0.0"
               }
 
               buildTypes {
@@ -100,14 +101,16 @@ jobs:
 
           cat > android_app/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
               <uses-permission android:name="android.permission.INTERNET"/>
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
               <application
                   android:theme="@style/AppTheme"
-                  android:label="بوح التضاريس V10"
+                  android:label="بوح التضاريس V11"
+                  android:usesCleartextTraffic="true"
+                  android:hardwareAccelerated="true"
                   android:allowBackup="true"
                   android:supportsRtl="true">
 
@@ -134,80 +137,21 @@ jobs:
           import android.os.Build;
           import android.content.*;
           import android.content.pm.PackageManager;
-          import android.database.Cursor;
-          import android.database.sqlite.SQLiteDatabase;
-          import android.graphics.*;
           import android.location.*;
-          import android.text.InputType;
-          import android.view.*;
-          import android.widget.*;
+          import android.net.Uri;
+          import android.view.ViewGroup;
+          import android.webkit.*;
+          import android.widget.Toast;
 
-          import java.io.*;
-          import java.util.*;
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.util.Locale;
 
           public class MainActivity extends Activity {
 
-              final int BG = Color.rgb(5, 7, 10);
-              final int PANEL = Color.rgb(12, 18, 20);
-              final int PANEL2 = Color.rgb(9, 13, 15);
-              final int GOLD = Color.rgb(212, 175, 55);
-              final int CYAN = Color.rgb(0, 229, 255);
-              final int RED = Color.rgb(220, 60, 60);
-              final int GREEN = Color.rgb(90, 220, 130);
-              final int TXT = Color.rgb(235, 245, 245);
-              final int MUTED = Color.rgb(150, 165, 165);
-
-              LinearLayout root;
-              LinearLayout navBox;
-              FrameLayout content;
-              TextView header;
-              TextView status;
-
-              MapPanel mapPanel;
-              TextView mapInfo;
-              Spinner layerSpinner;
-
-              EditText latInput, lonInput, noteInput, aiInput;
-              TextView resultView, aiOutput;
-              Spinner riskSpinner;
-
-              CheckBox cbStructure, cbAlteration, cbQuartz, cbGossan, cbWadi, cbOldWork, cbGPZ, cbVirgin;
-
-              double gpsLat = 19.793522;
-              double gpsLon = 36.556198;
-
-              ArrayList<Target> registry = new ArrayList<Target>();
-              ArrayList<Target> saved = new ArrayList<Target>();
-
-              static class Target {
-                  String id, group, kind, note;
-                  double lat, lon, score;
-                  Target(String id, double lat, double lon, String group, String kind, double score, String note) {
-                      this.id = id;
-                      this.lat = lat;
-                      this.lon = lon;
-                      this.group = group;
-                      this.kind = kind;
-                      this.score = score;
-                      this.note = note;
-                  }
-              }
-
-              static class Pixel {
-                  double iron = 0;
-                  double clay = 0;
-                  double silica = 0;
-                  double lineament = 0;
-                  double slope = 0;
-                  double magnetic = 0;
-                  double gravity = 0;
-                  String source = "no_pixel_database";
-              }
-
-              static class Prediction {
-                  double s, a, p, f, risk, score;
-                  String cls, decision, advice;
-              }
+              WebView web;
+              double lastLat = 19.793522;
+              double lastLon = 36.556198;
 
               @Override
               protected void onCreate(Bundle b) {
@@ -217,1089 +161,679 @@ jobs:
                       requestPermissions(new String[]{
                               Manifest.permission.ACCESS_FINE_LOCATION,
                               Manifest.permission.ACCESS_COARSE_LOCATION
-                      }, 10);
+                      }, 7);
                   }
 
-                  ensureDataFolders();
-                  loadRegistry();
-                  loadSaved();
-                  buildUI();
-                  showMap();
-              }
-
-              void buildUI() {
-                  root = new LinearLayout(this);
-                  root.setOrientation(LinearLayout.VERTICAL);
-                  root.setBackgroundColor(BG);
-                  root.setPadding(dp(10), dp(12), dp(10), dp(10));
-
-                  header = text("بوح التضاريس | منظومة أبوعزيزه V10 PRO", 20, GOLD, true);
-                  header.setGravity(Gravity.CENTER);
-
-                  TextView sub = text("GPS + Offline Map + Multi-Layer Analysis + GeoAI + KML Export", 12, CYAN, false);
-                  sub.setGravity(Gravity.CENTER);
-
-                  status = text("SYSTEM READY | DATA PATH: " + dataRoot().getAbsolutePath() + "/BOUH_DATA", 11, MUTED, false);
-                  status.setGravity(Gravity.CENTER);
-
-                  navBox = new LinearLayout(this);
-                  navBox.setOrientation(LinearLayout.VERTICAL);
-
-                  LinearLayout r1 = row();
-                  r1.addView(tab("الخريطة", new View.OnClickListener() { public void onClick(View v) { showMap(); }}));
-                  r1.addView(tab("تحليل", new View.OnClickListener() { public void onClick(View v) { showAnalyze(); }}));
-                  r1.addView(tab("AI", new View.OnClickListener() { public void onClick(View v) { showAI(); }}));
-
-                  LinearLayout r2 = row();
-                  r2.addView(tab("الطبقات", new View.OnClickListener() { public void onClick(View v) { showLayers(); }}));
-                  r2.addView(tab("البيانات", new View.OnClickListener() { public void onClick(View v) { showData(); }}));
-                  r2.addView(tab("تصدير", new View.OnClickListener() { public void onClick(View v) { showExport(); }}));
-
-                  LinearLayout r3 = row();
-                  r3.addView(tab("GPS", new View.OnClickListener() { public void onClick(View v) { captureGPS(); showMap(); }}));
-                  r3.addView(tab("السجل", new View.OnClickListener() { public void onClick(View v) { showLog(); }}));
-                  r3.addView(tab("إعدادات", new View.OnClickListener() { public void onClick(View v) { showSettings(); }}));
-
-                  navBox.addView(r1);
-                  navBox.addView(r2);
-                  navBox.addView(r3);
-
-                  content = new FrameLayout(this);
-                  LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, 0, 1);
-
-                  root.addView(header);
-                  root.addView(sub);
-                  root.addView(status);
-                  root.addView(navBox);
-                  root.addView(content, cp);
-
-                  setContentView(root);
-              }
-
-              Button tab(String s, View.OnClickListener l) {
-                  Button b = new Button(this);
-                  b.setText(s);
-                  b.setTextSize(12);
-                  b.setTypeface(null, Typeface.BOLD);
-                  b.setTextColor(Color.BLACK);
-                  b.setBackgroundColor(GOLD);
-                  b.setOnClickListener(l);
-                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1);
-                  lp.setMargins(dp(3), dp(4), dp(3), dp(4));
-                  b.setLayoutParams(lp);
-                  return b;
-              }
-
-              void showMap() {
-                  content.removeAllViews();
-
-                  LinearLayout box = col();
-                  box.setPadding(0, dp(8), 0, 0);
-
-                  layerSpinner = new Spinner(this);
-                  layerSpinner.setAdapter(new ArrayAdapter<String>(
-                          this,
-                          android.R.layout.simple_spinner_dropdown_item,
-                          new String[]{
-                                  "Field Intelligence",
-                                  "Spectral Gold Score",
-                                  "DEM / Terrain",
-                                  "Targets Only"
-                          }
-                  ));
-                  layerSpinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-                      public void onItemSelected(android.widget.AdapterView<?> parent, View view, int pos, long id) {
-                          if (mapPanel != null) {
-                              mapPanel.layer = pos;
-                              mapPanel.invalidate();
-                          }
-                      }
-                      public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-                  });
-
-                  mapPanel = new MapPanel(this);
-                  mapInfo = text("اضغط على الخريطة لاستخراج الإحداثيات والتحليل.", 12, TXT, false);
-
-                  LinearLayout controls = row();
-                  Button zoomIn = smallButton("+");
-                  zoomIn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { mapPanel.zoomIn(); }});
-                  Button zoomOut = smallButton("-");
-                  zoomOut.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { mapPanel.zoomOut(); }});
-                  Button centerGPS = smallButton("مركزة GPS");
-                  centerGPS.setOnClickListener(new View.OnClickListener() {
-                      public void onClick(View v) {
-                          captureGPS();
-                          mapPanel.centerLat = gpsLat;
-                          mapPanel.centerLon = gpsLon;
-                          mapPanel.invalidate();
-                      }
-                  });
-
-                  controls.addView(zoomIn);
-                  controls.addView(zoomOut);
-                  controls.addView(centerGPS);
-
-                  box.addView(label("طبقة الخريطة"));
-                  box.addView(layerSpinner);
-                  box.addView(mapPanel, new LinearLayout.LayoutParams(-1, 0, 1));
-                  box.addView(controls);
-                  box.addView(card("نتيجة النقرة", mapInfo));
-
-                  content.addView(box);
-              }
-
-              class MapPanel extends View {
-                  Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-                  double centerLat = gpsLat;
-                  double centerLon = gpsLon;
-                  double spanLat = 1.20;
-                  double spanLon = 1.20;
-                  int layer = 0;
-                  float lx, ly;
-                  boolean dragging = false;
-                  long downTime = 0;
-
-                  MapPanel(Context c) {
-                      super(c);
-                      setBackgroundColor(BG);
-                  }
-
-                  @Override
-                  protected void onDraw(Canvas c) {
-                      super.onDraw(c);
-                      drawBackground(c);
-                      drawGrid(c);
-                      drawTargets(c);
-                      drawGPS(c);
-                      drawHud(c);
-                  }
-
-                  void drawBackground(Canvas c) {
-                      p.setStyle(Paint.Style.FILL);
-                      for (int y = 0; y < getHeight(); y += 28) {
-                          for (int x = 0; x < getWidth(); x += 28) {
-                              int v = (int)(30 + 30 * Math.sin((x + y) * 0.025));
-                              if (layer == 0) p.setColor(Color.rgb(8, 22 + v / 3, 14));
-                              else if (layer == 1) p.setColor(Color.rgb(25 + v / 2, 12 + v / 4, 8));
-                              else if (layer == 2) p.setColor(Color.rgb(22 + v / 3, 22 + v / 3, 22 + v / 3));
-                              else p.setColor(Color.rgb(6, 8, 10));
-                              c.drawRect(x, y, x + 28, y + 28, p);
-                          }
-                      }
-                  }
-
-                  void drawGrid(Canvas c) {
-                      p.setStyle(Paint.Style.STROKE);
-                      p.setStrokeWidth(1);
-                      p.setColor(Color.argb(90, 0, 229, 255));
-
-                      for (int x = 0; x <= getWidth(); x += dp(70)) c.drawLine(x, 0, x, getHeight(), p);
-                      for (int y = 0; y <= getHeight(); y += dp(70)) c.drawLine(0, y, getWidth(), y, p);
-                  }
-
-                  void drawTargets(Canvas c) {
-                      for (Target t : registry) drawTarget(c, t, false);
-                      for (Target t : saved) drawTarget(c, t, true);
-                  }
-
-                  void drawTarget(Canvas c, Target t, boolean user) {
-                      float[] xy = toScreen(t.lat, t.lon);
-                      if (xy[0] < -30 || xy[1] < -30 || xy[0] > getWidth() + 30 || xy[1] > getHeight() + 30) return;
-
-                      if (user) p.setColor(CYAN);
-                      else if (t.group.equals("ANALOG")) p.setColor(GOLD);
-                      else if (t.group.equals("TARGET")) p.setColor(RED);
-                      else p.setColor(Color.WHITE);
-
-                      p.setStyle(Paint.Style.FILL);
-                      c.drawCircle(xy[0], xy[1], dp(user ? 6 : 5), p);
-
-                      p.setTextSize(dp(10));
-                      c.drawText(t.id, xy[0] + dp(7), xy[1] - dp(4), p);
-
-                      if (t.score >= 80) {
-                          p.setStyle(Paint.Style.STROKE);
-                          p.setStrokeWidth(dp(2));
-                          p.setColor(Color.argb(190, 220, 60, 60));
-                          c.drawCircle(xy[0], xy[1], dp(16), p);
-                      }
-                  }
-
-                  void drawGPS(Canvas c) {
-                      float[] xy = toScreen(gpsLat, gpsLon);
-                      p.setStyle(Paint.Style.STROKE);
-                      p.setStrokeWidth(dp(2));
-                      p.setColor(CYAN);
-                      c.drawLine(xy[0] - dp(16), xy[1], xy[0] + dp(16), xy[1], p);
-                      c.drawLine(xy[0], xy[1] - dp(16), xy[0], xy[1] + dp(16), p);
-                  }
-
-                  void drawHud(Canvas c) {
-                      p.setStyle(Paint.Style.FILL);
-                      p.setColor(Color.argb(210, 5, 7, 10));
-                      c.drawRect(0, 0, getWidth(), dp(56), p);
-
-                      p.setColor(GOLD);
-                      p.setTextSize(dp(12));
-                      c.drawText("BOUH V10 | " + getLayerName() + " | " + registry.size() + " targets", dp(8), dp(20), p);
-
-                      p.setColor(CYAN);
-                      c.drawText("CENTER " + f6(centerLat) + ", " + f6(centerLon), dp(8), dp(42), p);
-                  }
-
-                  String getLayerName() {
-                      if (layer == 1) return "Spectral Gold Score";
-                      if (layer == 2) return "DEM / Terrain";
-                      if (layer == 3) return "Targets Only";
-                      return "Field Intelligence";
-                  }
-
-                  @Override
-                  public boolean onTouchEvent(MotionEvent e) {
-                      if (e.getAction() == MotionEvent.ACTION_DOWN) {
-                          lx = e.getX();
-                          ly = e.getY();
-                          dragging = false;
-                          downTime = System.currentTimeMillis();
-                          return true;
-                      }
-
-                      if (e.getAction() == MotionEvent.ACTION_MOVE) {
-                          float dx = e.getX() - lx;
-                          float dy = e.getY() - ly;
-                          if (Math.abs(dx) + Math.abs(dy) > 9) dragging = true;
-
-                          centerLon -= dx / getWidth() * spanLon;
-                          centerLat += dy / getHeight() * spanLat;
-
-                          lx = e.getX();
-                          ly = e.getY();
-                          invalidate();
-                          return true;
-                      }
-
-                      if (e.getAction() == MotionEvent.ACTION_UP) {
-                          if (!dragging && System.currentTimeMillis() - downTime < 700) {
-                              double[] ll = toLatLon(e.getX(), e.getY());
-                              handleMapTap(ll[0], ll[1]);
-                          }
-                          return true;
-                      }
-
-                      return true;
-                  }
-
-                  void zoomIn() {
-                      spanLat *= 0.65;
-                      spanLon *= 0.65;
-                      invalidate();
-                  }
-
-                  void zoomOut() {
-                      spanLat *= 1.45;
-                      spanLon *= 1.45;
-                      invalidate();
-                  }
-
-                  float[] toScreen(double lat, double lon) {
-                      float x = (float)((lon - centerLon) / spanLon * getWidth() + getWidth() / 2.0);
-                      float y = (float)((centerLat - lat) / spanLat * getHeight() + getHeight() / 2.0);
-                      return new float[]{x, y};
-                  }
-
-                  double[] toLatLon(float x, float y) {
-                      double lon = centerLon + (x - getWidth() / 2.0) / getWidth() * spanLon;
-                      double lat = centerLat - (y - getHeight() / 2.0) / getHeight() * spanLat;
-                      return new double[]{lat, lon};
-                  }
-              }
-
-              void handleMapTap(double lat, double lon) {
-                  Pixel px = queryPixel(lat, lon);
-                  Target n = nearest(lat, lon);
-                  Prediction pr = predict(lat, lon, px, n, false, false, false, false, false, false, false, false);
-
-                  mapInfo.setText(
-                          "LAT=" + f6(lat) +
-                          "\nLON=" + f6(lon) +
-                          "\nNEAREST=" + n.id + " / " + n.kind +
-                          "\nDIST_KM=" + fmt(distanceKm(lat, lon, n.lat, n.lon)) +
-                          "\nPIXEL_SOURCE=" + px.source +
-                          "\nIRON=" + f6(px.iron) +
-                          "\nCLAY=" + f6(px.clay) +
-                          "\nSILICA=" + f6(px.silica) +
-                          "\nLINEAMENT=" + f6(px.lineament) +
-                          "\nSLOPE=" + f6(px.slope) +
-                          "\n\nSCORE=" + fmt(pr.score) + "%" +
-                          "\nCLASS=" + pr.cls +
-                          "\nDECISION=" + pr.decision +
-                          "\n\n" + pr.advice
-                  );
-              }
-
-              void showAnalyze() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-                  box.setPadding(0, dp(8), 0, dp(20));
-
-                  latInput = input("Latitude", true);
-                  lonInput = input("Longitude", true);
-                  latInput.setText(f6(gpsLat));
-                  lonInput.setText(f6(gpsLon));
-
-                  noteInput = input("ملاحظات ميدانية: كوارتز، جوسان، وادي، GPZ، لودر...", false);
-                  noteInput.setMinLines(3);
-
-                  cbStructure = check("Structure / Fault / Shear");
-                  cbAlteration = check("Clay / Argillic / Phyllic");
-                  cbQuartz = check("Quartz / Silica / Vein");
-                  cbGossan = check("Gossan / Iron Hat");
-                  cbWadi = check("Wadi Trap / Slope Break");
-                  cbOldWork = check("Old Work / Loader / Pits");
-                  cbGPZ = check("GPZ / ZVT repeated signal");
-                  cbVirgin = check("Virgin dark regolith");
-
-                  riskSpinner = new Spinner(this);
-                  riskSpinner.setAdapter(new ArrayAdapter<String>(
-                          this,
-                          android.R.layout.simple_spinner_dropdown_item,
-                          new String[]{"Normal ground", "Medium ironstone", "Severe magnetic ground"}
+                  web = new WebView(this);
+                  web.setLayoutParams(new ViewGroup.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT,
+                          ViewGroup.LayoutParams.MATCH_PARENT
                   ));
 
-                  Button gps = bigButton("التقاط GPS");
-                  gps.setOnClickListener(new View.OnClickListener() {
-                      public void onClick(View v) {
-                          captureGPS();
-                          latInput.setText(f6(gpsLat));
-                          lonInput.setText(f6(gpsLon));
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setDatabaseEnabled(true);
+                  s.setGeolocationEnabled(true);
+                  s.setAllowFileAccess(true);
+                  s.setAllowContentAccess(true);
+                  s.setLoadWithOverviewMode(true);
+                  s.setUseWideViewPort(true);
+                  if (Build.VERSION.SDK_INT >= 21) {
+                      s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                  }
+
+                  web.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                          callback.invoke(origin, true, false);
                       }
                   });
 
-                  Button run = bigButton("تحليل وحفظ الهدف");
-                  run.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { runAnalyze(); }});
+                  web.setWebViewClient(new WebViewClient());
+                  web.addJavascriptInterface(new Bridge(), "BOUH");
 
-                  resultView = text("READY", 13, TXT, false);
-
-                  box.addView(card("الإحداثيات", wrap(latInput, lonInput, gps)));
-                  box.addView(card("مؤشرات الهدف", wrap(cbStructure, cbAlteration, cbQuartz, cbGossan, cbWadi, cbOldWork, cbGPZ, cbVirgin)));
-                  box.addView(card("مخاطر الأرض المغناطيسية", riskSpinner));
-                  box.addView(card("ملاحظات", noteInput));
-                  box.addView(run);
-                  box.addView(card("نتيجة التحليل", resultView));
-
-                  sc.addView(box);
-                  content.addView(sc);
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
               }
 
-              void runAnalyze() {
-                  try {
-                      double lat = Double.parseDouble(latInput.getText().toString().trim());
-                      double lon = Double.parseDouble(lonInput.getText().toString().trim());
-
-                      Pixel px = queryPixel(lat, lon);
-                      Target n = nearest(lat, lon);
-
-                      Prediction pr = predict(
-                              lat, lon, px, n,
-                              cbStructure.isChecked(),
-                              cbAlteration.isChecked(),
-                              cbQuartz.isChecked(),
-                              cbGossan.isChecked(),
-                              cbWadi.isChecked(),
-                              cbOldWork.isChecked(),
-                              cbGPZ.isChecked(),
-                              cbVirgin.isChecked()
-                      );
-
-                      Target t = new Target(
-                              "U" + System.currentTimeMillis(),
-                              lat,
-                              lon,
-                              "USER",
-                              pr.cls,
-                              pr.score,
-                              noteInput.getText().toString() + " | " + pr.decision
-                      );
-
-                      saved.add(0, t);
-                      saveSaved();
-
-                      resultView.setText(
-                              "SCORE=" + fmt(pr.score) + "%" +
-                              "\nS=" + fmt(pr.s) +
-                              "\nA=" + fmt(pr.a) +
-                              "\nP=" + fmt(pr.p) +
-                              "\nF=" + fmt(pr.f) +
-                              "\nRISK=" + fmt(pr.risk) +
-                              "\nCLASS=" + pr.cls +
-                              "\nDECISION=" + pr.decision +
-                              "\nNEAREST=" + n.id +
-                              "\nPIXEL_SOURCE=" + px.source +
-                              "\n\n" + pr.advice
-                      );
-
-                      Toast.makeText(this, "تم حفظ الهدف", Toast.LENGTH_SHORT).show();
-
-                  } catch (Exception e) {
-                      resultView.setText("ERROR: invalid coordinates");
-                  }
-              }
-
-              Prediction predict(
-                      double lat,
-                      double lon,
-                      Pixel px,
-                      Target n,
-                      boolean st,
-                      boolean al,
-                      boolean q,
-                      boolean g,
-                      boolean w,
-                      boolean old,
-                      boolean gpz,
-                      boolean vir
-              ) {
-                  Prediction pr = new Prediction();
-                  double d = distanceKm(lat, lon, n.lat, n.lon);
-
-                  pr.s = (st ? 65 : 0) + Math.min(35, px.lineament * 35) + (d < 2 ? 8 : 0);
-                  pr.a = (al ? 35 : 0) + (q ? 28 : 0) + (g ? 22 : 0)
-                          + Math.min(20, px.clay * 10)
-                          + Math.min(25, px.silica * 25)
-                          + Math.min(15, px.iron * 4);
-                  pr.p = (w ? 45 : 0) + (vir ? 18 : 0) + (d < 3 ? 12 : 0) + Math.min(15, px.slope * 12);
-                  pr.f = (old ? 25 : 0) + (gpz ? 35 : 0) + (n.group.equals("ANALOG") && d < 5 ? 18 : 0);
-
-                  int riskMode = riskSpinner == null ? 0 : riskSpinner.getSelectedItemPosition();
-                  pr.risk = (riskMode == 2 ? 30 : (riskMode == 1 ? 15 : 5)) + Math.min(25, px.magnetic * 25);
-
-                  pr.s = clamp(pr.s);
-                  pr.a = clamp(pr.a);
-                  pr.p = clamp(pr.p);
-                  pr.f = clamp(pr.f);
-                  pr.risk = clamp(pr.risk);
-
-                  pr.score = clamp(0.34 * pr.s + 0.30 * pr.a + 0.20 * pr.p + 0.16 * pr.f - 0.12 * pr.risk);
-
-                  boolean hasStructure = pr.s >= 35;
-                  boolean hasAlteration = pr.a >= 30;
-                  boolean hasField = pr.f >= 25;
-
-                  if (!hasStructure && !hasField) pr.score = 0;
-                  if (!hasAlteration && !hasField) pr.score = Math.min(pr.score, 54);
-
-                  if (pr.score >= 85 && hasStructure && hasAlteration) {
-                      pr.cls = "S-TIER VEIN / SUPERGENE";
-                      pr.decision = "FIELD PRIORITY 1";
-                  } else if (pr.score >= 70) {
-                      pr.cls = "HIGH CANDIDATE";
-                      pr.decision = "FIELD CHECK + SAMPLE";
-                  } else if (pr.score >= 55) {
-                      pr.cls = "HOLD";
-                      pr.decision = "FAST CHECK ONLY";
-                  } else if (pr.score == 0) {
-                      pr.cls = "KILL";
-                      pr.decision = "DO NOT DIG";
-                  } else {
-                      pr.cls = "LOW";
-                      pr.decision = "OBSERVE ONLY";
+              public class Bridge {
+                  @JavascriptInterface
+                  public void requestGPS() {
+                      runOnUiThread(new Runnable() {
+                          @Override
+                          public void run() {
+                              captureGPS();
+                          }
+                      });
                   }
 
-                  pr.advice =
-                          "خطة العمل:\n" +
-                          "1) تحقق من وجود كوارتز/جوسان/طين تحول.\n" +
-                          "2) امسح GPZ/ZVT بخطوط متقاطعة وببطء.\n" +
-                          "3) لا تحفر إلا مع إشارة متكررة + بنية + تحول.\n" +
-                          "4) سجل صورة، عينة، وصف صخري، ثم صدّر KML.";
-
-                  return pr;
-              }
-
-              void showAI() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-                  box.setPadding(0, dp(8), 0, dp(20));
-
-                  aiInput = input("اكتب وصف الموقع: كوارتز، جوسان، وادي، إشارة GPZ، طين أحمر، قص، لودر...", false);
-                  aiInput.setMinLines(6);
-
-                  Button run = bigButton("تشغيل GeoAI Offline");
-                  aiOutput = text("GeoAI Expert Engine جاهز بدون إنترنت.", 13, TXT, false);
-
-                  run.setOnClickListener(new View.OnClickListener() {
-                      public void onClick(View v) {
-                          String s = aiInput.getText().toString().toLowerCase(Locale.US);
-
-                          int quartz = has(s, "كوارتز", "مرو", "quartz", "silica") ? 1 : 0;
-                          int gossan = has(s, "جوسان", "حديد", "iron", "gossan", "hematite") ? 1 : 0;
-                          int structure = has(s, "فالق", "كسر", "قص", "fault", "shear", "lineament") ? 1 : 0;
-                          int wadi = has(s, "وادي", "شعب", "slope", "wadi", "trap") ? 1 : 0;
-                          int gpz = has(s, "gpz", "zvt", "إشارة", "اشارة", "signal") ? 1 : 0;
-                          int old = has(s, "لودر", "حفر", "pits", "loader", "old") ? 1 : 0;
-
-                          int score = quartz * 22 + gossan * 18 + structure * 25 + wadi * 12 + gpz * 25 + old * 10;
-                          if (structure == 0 && gpz == 0) score = 0;
-
-                          String decision = score >= 80 ? "أولوية عالية للفحص"
-                                  : score >= 55 ? "HOLD / فحص سريع"
-                                  : "منخفض؛ ابحث عن بنية أو دليل ميداني";
-
-                          aiOutput.setText(
-                                  "AI_SCORE=" + score + "%" +
-                                  "\nquartz=" + quartz +
-                                  "\ngossan=" + gossan +
-                                  "\nstructure=" + structure +
-                                  "\nwadi_trap=" + wadi +
-                                  "\ngpz_signal=" + gpz +
-                                  "\nold_work=" + old +
-                                  "\n\nDECISION=" + decision +
-                                  "\n\nهذا مساعد ذكاء جيولوجي محلي يعمل بدون إنترنت بنظام قواعد وتنبؤ. لا يؤكد وجود الذهب؛ يعطي أولوية ميدانية."
-                          );
-                      }
-                  });
-
-                  box.addView(card("إدخال وصف ميداني", aiInput));
-                  box.addView(run);
-                  box.addView(card("نتيجة GeoAI", aiOutput));
-
-                  sc.addView(box);
-                  content.addView(sc);
-              }
-
-              void showLayers() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-
-                  String s =
-                          "الطبقات المتاحة داخل التطبيق:\n\n" +
-                          "1) Field Intelligence\n" +
-                          "2) Spectral Gold Score\n" +
-                          "3) DEM / Terrain\n" +
-                          "4) Targets Only\n\n" +
-                          "مجلد بياناتك الأصلي:\n" +
-                          dataRoot().getAbsolutePath() + "/BOUH_DATA/\n\n" +
-                          "ضع داخله الملفات التالية عند الحاجة:\n\n" +
-                          "BOUH_DATA/targets/targets.csv\n" +
-                          "BOUH_DATA/spectral/spectral_pixels.sqlite\n" +
-                          "BOUH_DATA/mbtiles/arbaat_base.mbtiles\n" +
-                          "BOUH_DATA/mbtiles/arbaat_dem.mbtiles\n" +
-                          "BOUH_DATA/exports/\n\n" +
-                          "قاعدة SQLite المتوقعة يمكن أن تحتوي أعمدة:\n" +
-                          "lat, lon, iron, clay, silica, lineament, slope, magnetic, gravity";
-
-                  box.addView(card("إدارة الطبقات", text(s, 13, TXT, false)));
-                  sc.addView(box);
-                  content.addView(sc);
-              }
-
-              void showData() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-                  StringBuilder sb = new StringBuilder();
-
-                  sb.append(dataHealth()).append("\n\n");
-                  sb.append("REGISTRY TARGETS\n");
-                  for (Target t : registry) {
-                      sb.append(t.id).append(" | ")
-                              .append(f6(t.lat)).append(", ").append(f6(t.lon))
-                              .append(" | ").append(t.group)
-                              .append(" | ").append(t.kind)
-                              .append(" | ").append(fmt(t.score)).append("%\n");
-                  }
-
-                  box.addView(card("البيانات الأصلية والمرتبطة", text(sb.toString(), 12, TXT, false)));
-                  sc.addView(box);
-                  content.addView(sc);
-              }
-
-              void showSettings() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-
-                  String s =
-                          "APP=BOUH Terrain V10 Pro\n" +
-                          "PACKAGE=com.abuaziza.bouhgoldpro\n" +
-                          "VERSION=10.0.0\n" +
-                          "GPS=Android LocationManager\n" +
-                          "MAP=Internal Offline Coordinate View\n" +
-                          "AI=Offline GeoAI Expert Engine\n" +
-                          "EXPORT=KML + CSV\n\n" +
-                          "تنبيه علمي:\n" +
-                          "هذا التطبيق لا يؤكد وجود الذهب. يعطي أولوية استهداف ميدانية مبنية على المؤشرات والبيانات المدخلة.";
-
-                  box.addView(card("إعدادات النظام", text(s, 13, TXT, false)));
-                  sc.addView(box);
-                  content.addView(sc);
-              }
-
-              void showExport() {
-                  content.removeAllViews();
-                  LinearLayout box = col();
-                  box.setPadding(0, dp(8), 0, dp(20));
-
-                  Button kml = bigButton("حفظ ونسخ KML");
-                  kml.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { exportKML(); }});
-
-                  Button csv = bigButton("نسخ CSV");
-                  csv.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { copyCSV(); }});
-
-                  Button log = bigButton("عرض السجل");
-                  log.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showLog(); }});
-
-                  box.addView(card("تصدير", wrap(kml, csv, log)));
-                  content.addView(box);
-              }
-
-              void showLog() {
-                  content.removeAllViews();
-                  ScrollView sc = new ScrollView(this);
-                  LinearLayout box = col();
-
-                  StringBuilder sb = new StringBuilder();
-                  if (saved.size() == 0) sb.append("NO_SAVED_TARGETS");
-
-                  for (Target t : saved) {
-                      sb.append(t.id)
-                              .append(" | ").append(f6(t.lat)).append(", ").append(f6(t.lon))
-                              .append(" | ").append(fmt(t.score)).append("%")
-                              .append(" | ").append(t.kind)
-                              .append("\n").append(t.note)
-                              .append("\n\n");
-                  }
-
-                  Button clear = bigButton("حذف السجل المحلي");
-                  clear.setBackgroundColor(RED);
-                  clear.setTextColor(Color.WHITE);
-                  clear.setOnClickListener(new View.OnClickListener() {
-                      public void onClick(View v) {
-                          saved.clear();
-                          saveSaved();
-                          showLog();
-                      }
-                  });
-
-                  box.addView(card("سجل الأهداف", text(sb.toString(), 12, TXT, false)));
-                  box.addView(clear);
-
-                  sc.addView(box);
-                  content.addView(sc);
-              }
-
-              Pixel queryPixel(double lat, double lon) {
-                  Pixel p = new Pixel();
-
-                  File dbFile = new File(new File(dataRoot(), "BOUH_DATA/spectral"), "spectral_pixels.sqlite");
-                  if (!dbFile.exists()) return p;
-
-                  SQLiteDatabase db = null;
-                  try {
-                      db = SQLiteDatabase.openDatabase(dbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
-                      Cursor c = db.rawQuery(
-                              "SELECT *, ((lat-?)*(lat-?) + (lon-?)*(lon-?)) AS dd FROM spectral_pixels ORDER BY dd ASC LIMIT 1",
-                              new String[]{"" + lat, "" + lat, "" + lon, "" + lon}
-                      );
-
-                      if (c.moveToFirst()) {
-                          p.iron = col(c, "iron", "feox", "iron_oxide");
-                          p.clay = col(c, "clay", "clay_oh", "argillic");
-                          p.silica = col(c, "silica", "quartz", "quartz_qi");
-                          p.lineament = col(c, "lineament", "fault_density");
-                          p.slope = col(c, "slope");
-                          p.magnetic = col(c, "magnetic", "ironstone");
-                          p.gravity = col(c, "gravity");
-                          p.source = "spectral_pixels.sqlite";
-                      }
-
-                      c.close();
-                      db.close();
-
-                  } catch (Exception e) {
-                      try { if (db != null) db.close(); } catch (Exception ignored) {}
-                      p.source = "sqlite_error";
-                  }
-
-                  return p;
-              }
-
-              double col(Cursor c, String... names) {
-                  for (String n : names) {
-                      int i = c.getColumnIndex(n);
-                      if (i >= 0) {
-                          try { return c.getDouble(i); } catch (Exception ignored) {}
-                      }
-                  }
-                  return 0;
-              }
-
-              void loadRegistry() {
-                  registry.clear();
-
-                  File csv = new File(new File(dataRoot(), "BOUH_DATA/targets"), "targets.csv");
-                  if (csv.exists()) {
+                  @JavascriptInterface
+                  public void saveKML(String name, String kml) {
                       try {
-                          BufferedReader br = new BufferedReader(new FileReader(csv));
-                          String line;
-                          while ((line = br.readLine()) != null) {
-                              String[] p = line.split(",", -1);
-                              if (p.length >= 6 && !line.toLowerCase(Locale.US).contains("lat")) {
-                                  registry.add(new Target(
-                                          p[0],
-                                          Double.parseDouble(p[1]),
-                                          Double.parseDouble(p[2]),
-                                          p[3],
-                                          p[4],
-                                          Double.parseDouble(p[5]),
-                                          p.length > 6 ? p[6] : ""
-                                  ));
-                              }
+                          File dir = new File(getExternalFilesDir(null), "BOUH_EXPORTS");
+                          dir.mkdirs();
+
+                          if (name == null || name.trim().length() == 0) {
+                              name = "bouh_targets.kml";
                           }
-                          br.close();
-                      } catch (Exception ignored) {}
-                  }
 
-                  if (registry.size() == 0) defaultRegistry();
-              }
+                          File out = new File(dir, name.replace("/", "_"));
+                          FileOutputStream fos = new FileOutputStream(out);
+                          fos.write(kml.getBytes("UTF-8"));
+                          fos.close();
 
-              void defaultRegistry() {
-                  registry.add(new Target("A1", 19.793522, 36.556198, "ANALOG", "GPZ Hand-Pit Dark Regolith", 92, "مرجع ميداني"));
-                  registry.add(new Target("A2", 19.834457, 36.478347, "ANALOG", "Loader Expansion Dark Regolith", 88, "توسع لودر"));
-                  registry.add(new Target("A3", 20.492444, 36.348738, "ANALOG", "Dark Knoll Pediment", 84, "نتوء داكن"));
-                  registry.add(new Target("TargetB", 20.780500, 36.450700, "TARGET", "HOLD+ Landsat/ASTER candidate", 70, "بيانات جزئية"));
-                  registry.add(new Target("Z01", 20.802185, 36.380156, "CANDIDATE", "Fusion HOLD+ Candidate", 79, "فرز متعدد"));
-                  registry.add(new Target("R01", 19.999442, 37.015231, "REGIONAL", "Regional Grid Candidate", 69, "فرز إقليمي"));
-              }
+                          Toast.makeText(MainActivity.this, "KML saved: " + out.getAbsolutePath(), Toast.LENGTH_LONG).show();
 
-              Target nearest(double lat, double lon) {
-                  Target best = registry.get(0);
-                  double bd = 999999;
+                          Intent share = new Intent(Intent.ACTION_SEND);
+                          share.setType("text/plain");
+                          share.putExtra(Intent.EXTRA_TEXT, kml);
+                          startActivity(Intent.createChooser(share, "Share KML"));
 
-                  for (Target t : registry) {
-                      double d = distanceKm(lat, lon, t.lat, t.lon);
-                      if (d < bd) {
-                          bd = d;
-                          best = t;
+                      } catch (Exception e) {
+                          Toast.makeText(MainActivity.this, "KML save error", Toast.LENGTH_LONG).show();
                       }
                   }
 
-                  return best;
+                  @JavascriptInterface
+                  public void shareText(String title, String text) {
+                      Intent send = new Intent(Intent.ACTION_SEND);
+                      send.setType("text/plain");
+                      send.putExtra(Intent.EXTRA_SUBJECT, title);
+                      send.putExtra(Intent.EXTRA_TEXT, text);
+                      startActivity(Intent.createChooser(send, title));
+                  }
               }
 
               void captureGPS() {
                   try {
-                      final LocationManager lm = (LocationManager) getSystemService(LOCATION_SERVICE);
-
                       if (Build.VERSION.SDK_INT >= 23 &&
                               checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 10);
+                          requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 7);
                           return;
                       }
 
+                      LocationManager lm = (LocationManager)getSystemService(LOCATION_SERVICE);
                       Location loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                       if (loc == null) loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
 
                       if (loc != null) {
-                          gpsLat = loc.getLatitude();
-                          gpsLon = loc.getLongitude();
-                          status.setText("GPS=" + f6(gpsLat) + ", " + f6(gpsLon));
+                          lastLat = loc.getLatitude();
+                          lastLon = loc.getLongitude();
+                          sendGPS();
                       }
 
                       lm.requestSingleUpdate(LocationManager.GPS_PROVIDER, new LocationListener() {
+                          @Override
                           public void onLocationChanged(Location location) {
-                              gpsLat = location.getLatitude();
-                              gpsLon = location.getLongitude();
-                              status.setText("GPS=" + f6(gpsLat) + ", " + f6(gpsLon));
+                              lastLat = location.getLatitude();
+                              lastLon = location.getLongitude();
+                              sendGPS();
                           }
-                          public void onStatusChanged(String provider, int status, Bundle extras) {}
-                          public void onProviderEnabled(String provider) {}
-                          public void onProviderDisabled(String provider) {}
+
+                          @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+                          @Override public void onProviderEnabled(String provider) {}
+                          @Override public void onProviderDisabled(String provider) {}
                       }, null);
 
-                      Toast.makeText(this, "GPS updating...", Toast.LENGTH_SHORT).show();
-
                   } catch (Exception e) {
-                      Toast.makeText(this, "GPS_ERROR", Toast.LENGTH_SHORT).show();
+                      Toast.makeText(this, "GPS error", Toast.LENGTH_SHORT).show();
                   }
               }
 
-              void loadSaved() {
-                  String raw = getPreferences(0).getString("saved", "");
-                  for (String line : raw.split("\n")) {
-                      if (line.trim().isEmpty()) continue;
-                      String[] p = line.split("\\|", -1);
-                      if (p.length >= 7) {
-                          try {
-                              saved.add(new Target(
-                                      p[0],
-                                      Double.parseDouble(p[1]),
-                                      Double.parseDouble(p[2]),
-                                      p[3],
-                                      p[4],
-                                      Double.parseDouble(p[5]),
-                                      p[6]
-                              ));
-                          } catch (Exception ignored) {}
+              void sendGPS() {
+                  final String js = String.format(
+                          Locale.US,
+                          "window.setNativeGPS && window.setNativeGPS(%.6f, %.6f);",
+                          lastLat,
+                          lastLon
+                  );
+
+                  runOnUiThread(new Runnable() {
+                      @Override
+                      public void run() {
+                          if (Build.VERSION.SDK_INT >= 19) web.evaluateJavascript(js, null);
+                          else web.loadUrl("javascript:" + js);
                       }
-                  }
-              }
-
-              void saveSaved() {
-                  StringBuilder sb = new StringBuilder();
-                  for (Target t : saved) {
-                      sb.append(clean(t.id)).append("|")
-                              .append(t.lat).append("|")
-                              .append(t.lon).append("|")
-                              .append(clean(t.group)).append("|")
-                              .append(clean(t.kind)).append("|")
-                              .append(t.score).append("|")
-                              .append(clean(t.note)).append("\n");
-                  }
-                  getPreferences(0).edit().putString("saved", sb.toString()).apply();
-              }
-
-              String dataHealth() {
-                  File base = new File(dataRoot(), "BOUH_DATA");
-                  String[] fs = {
-                          "spectral/spectral_pixels.sqlite",
-                          "targets/targets.csv",
-                          "exports/",
-                          "ai/",
-                          "mbtiles/"
-                  };
-
-                  StringBuilder sb = new StringBuilder("DATA_HEALTH\n");
-                  for (String s : fs) {
-                      File f = new File(base, s);
-                      sb.append(s).append(" = ").append(f.exists() ? "FOUND" : "MISSING").append("\n");
-                  }
-
-                  return sb.toString();
-              }
-
-              void exportKML() {
-                  try {
-                      String kml = buildKML();
-                      File outDir = new File(dataRoot(), "BOUH_DATA/exports");
-                      outDir.mkdirs();
-
-                      File out = new File(outDir, "bouh_targets_v10.kml");
-                      FileOutputStream fos = new FileOutputStream(out);
-                      fos.write(kml.getBytes("UTF-8"));
-                      fos.close();
-
-                      copy("BOUH_KML", kml);
-                      Toast.makeText(this, "KML saved and copied", Toast.LENGTH_LONG).show();
-
-                  } catch (Exception e) {
-                      Toast.makeText(this, "KML_ERROR", Toast.LENGTH_SHORT).show();
-                  }
-              }
-
-              String buildKML() {
-                  StringBuilder sb = new StringBuilder();
-                  sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-                  sb.append("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>");
-                  sb.append("<name>BOUH V10 Targets</name>");
-
-                  for (Target t : saved) {
-                      sb.append("<Placemark>");
-                      sb.append("<name>").append(xml(t.id + " " + fmt(t.score) + "%")).append("</name>");
-                      sb.append("<description><![CDATA[")
-                              .append("CLASS=").append(t.kind)
-                              .append("<br>NOTE=").append(t.note)
-                              .append("]]></description>");
-                      sb.append("<Point><coordinates>")
-                              .append(f6(t.lon)).append(",").append(f6(t.lat)).append(",0")
-                              .append("</coordinates></Point>");
-                      sb.append("</Placemark>");
-                  }
-
-                  sb.append("</Document></kml>");
-                  return sb.toString();
-              }
-
-              void copyCSV() {
-                  StringBuilder sb = new StringBuilder("id,lat,lon,group,kind,score,note\n");
-                  for (Target t : saved) {
-                      sb.append(csv(t.id)).append(",")
-                              .append(f6(t.lat)).append(",")
-                              .append(f6(t.lon)).append(",")
-                              .append(csv(t.group)).append(",")
-                              .append(csv(t.kind)).append(",")
-                              .append(fmt(t.score)).append(",")
-                              .append(csv(t.note)).append("\n");
-                  }
-                  copy("BOUH_CSV", sb.toString());
-              }
-
-              void copy(String label, String text) {
-                  ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE))
-                          .setPrimaryClip(ClipData.newPlainText(label, text));
-                  Toast.makeText(this, "تم النسخ", Toast.LENGTH_SHORT).show();
-              }
-
-              void ensureDataFolders() {
-                  new File(dataRoot(), "BOUH_DATA/spectral").mkdirs();
-                  new File(dataRoot(), "BOUH_DATA/targets").mkdirs();
-                  new File(dataRoot(), "BOUH_DATA/exports").mkdirs();
-                  new File(dataRoot(), "BOUH_DATA/ai").mkdirs();
-                  new File(dataRoot(), "BOUH_DATA/mbtiles").mkdirs();
-              }
-
-              File dataRoot() {
-                  File f = getExternalFilesDir(null);
-                  if (f == null) f = getFilesDir();
-                  return f;
-              }
-
-              double distanceKm(double lat1, double lon1, double lat2, double lon2) {
-                  double R = 6371.0088;
-                  double p1 = Math.toRadians(lat1);
-                  double p2 = Math.toRadians(lat2);
-                  double dp = Math.toRadians(lat2 - lat1);
-                  double dl = Math.toRadians(lon2 - lon1);
-                  double a = Math.sin(dp / 2) * Math.sin(dp / 2)
-                          + Math.cos(p1) * Math.cos(p2)
-                          * Math.sin(dl / 2) * Math.sin(dl / 2);
-                  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-              }
-
-              boolean has(String s, String... arr) {
-                  for (String a : arr) {
-                      if (s.contains(a.toLowerCase(Locale.US))) return true;
-                  }
-                  return false;
-              }
-
-              double clamp(double v) {
-                  return Math.max(0, Math.min(100, v));
-              }
-
-              String fmt(double v) {
-                  return String.format(Locale.US, "%.2f", v);
-              }
-
-              String f6(double v) {
-                  return String.format(Locale.US, "%.6f", v);
-              }
-
-              String clean(String s) {
-                  if (s == null) return "";
-                  return s.replace("|", "/").replace("\n", " ");
-              }
-
-              String xml(String s) {
-                  return clean(s)
-                          .replace("&", "&amp;")
-                          .replace("<", "&lt;")
-                          .replace(">", "&gt;");
-              }
-
-              String csv(String s) {
-                  return "\"" + clean(s).replace("\"", "\"\"") + "\"";
-              }
-
-              TextView text(String s, int size, int color, boolean bold) {
-                  TextView t = new TextView(this);
-                  t.setText(s);
-                  t.setTextSize(size);
-                  t.setTextColor(color);
-                  t.setPadding(dp(6), dp(6), dp(6), dp(6));
-                  if (bold) t.setTypeface(null, Typeface.BOLD);
-                  return t;
-              }
-
-              TextView label(String s) {
-                  return text(s, 14, MUTED, true);
-              }
-
-              LinearLayout col() {
-                  LinearLayout l = new LinearLayout(this);
-                  l.setOrientation(LinearLayout.VERTICAL);
-                  return l;
-              }
-
-              LinearLayout row() {
-                  LinearLayout l = new LinearLayout(this);
-                  l.setOrientation(LinearLayout.HORIZONTAL);
-                  return l;
-              }
-
-              View wrap(View... views) {
-                  LinearLayout l = col();
-                  for (View v : views) l.addView(v);
-                  return l;
-              }
-
-              View card(String title, View child) {
-                  LinearLayout c = col();
-                  c.setPadding(dp(12), dp(12), dp(12), dp(12));
-                  c.setBackgroundColor(PANEL);
-
-                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-                  lp.setMargins(0, dp(10), 0, 0);
-                  c.setLayoutParams(lp);
-
-                  c.addView(text(title, 17, GOLD, true));
-                  c.addView(child);
-
-                  return c;
-              }
-
-              Button bigButton(String s) {
-                  Button b = new Button(this);
-                  b.setText(s);
-                  b.setTextSize(14);
-                  b.setTypeface(null, Typeface.BOLD);
-                  b.setTextColor(Color.BLACK);
-                  b.setBackgroundColor(GOLD);
-                  return b;
-              }
-
-              Button smallButton(String s) {
-                  Button b = bigButton(s);
-                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(44), 1);
-                  lp.setMargins(dp(3), dp(4), dp(3), dp(4));
-                  b.setLayoutParams(lp);
-                  return b;
-              }
-
-              CheckBox check(String s) {
-                  CheckBox c = new CheckBox(this);
-                  c.setText(s);
-                  c.setTextColor(TXT);
-                  c.setTextSize(13);
-                  return c;
-              }
-
-              EditText input(String hint, boolean numeric) {
-                  EditText e = new EditText(this);
-                  e.setHint(hint);
-                  e.setHintTextColor(MUTED);
-                  e.setTextColor(Color.WHITE);
-                  e.setTextSize(14);
-                  e.setPadding(dp(10), dp(8), dp(10), dp(8));
-                  e.setBackgroundColor(PANEL2);
-
-                  if (numeric) {
-                      e.setInputType(InputType.TYPE_CLASS_NUMBER
-                              | InputType.TYPE_NUMBER_FLAG_DECIMAL
-                              | InputType.TYPE_NUMBER_FLAG_SIGNED);
-                  } else {
-                      e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-                  }
-
-                  return e;
-              }
-
-              int dp(int v) {
-                  return (int)(v * getResources().getDisplayMetrics().density + 0.5f);
+                  });
               }
           }
+          EOF
+
+          cat > android_app/app/src/main/assets/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="ar" dir="rtl">
+          <head>
+            <meta charset="utf-8"/>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+            <title>BOUH Terrain V11</title>
+
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+            <style>
+              html, body {
+                margin:0;
+                padding:0;
+                width:100%;
+                height:100%;
+                background:#05070a;
+                color:#eaf7f7;
+                font-family: system-ui, Arial, sans-serif;
+                overflow:hidden;
+              }
+
+              #app {
+                display:flex;
+                flex-direction:column;
+                height:100vh;
+                width:100vw;
+                background:#05070a;
+              }
+
+              #header {
+                background:#05070a;
+                border-bottom:1px solid rgba(212,175,55,.35);
+                padding:8px 10px;
+              }
+
+              .title {
+                color:#d4af37;
+                font-weight:800;
+                font-size:17px;
+                text-align:center;
+              }
+
+              .sub {
+                color:#00e5ff;
+                font-size:11px;
+                text-align:center;
+                margin-top:2px;
+              }
+
+              #toolbar {
+                display:grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap:5px;
+                padding:7px;
+                background:#081012;
+              }
+
+              button, select, input, textarea {
+                border:0;
+                outline:0;
+                border-radius:8px;
+                padding:8px;
+                font-weight:700;
+                font-size:12px;
+              }
+
+              button {
+                background:#d4af37;
+                color:#05070a;
+              }
+
+              select, input, textarea {
+                background:#10181d;
+                color:#eaf7f7;
+                border:1px solid rgba(212,175,55,.25);
+              }
+
+              #map {
+                flex:1;
+                width:100%;
+                background:#081012;
+              }
+
+              #panel {
+                height:235px;
+                overflow:auto;
+                background:#071013;
+                border-top:1px solid rgba(0,229,255,.35);
+                padding:8px;
+                font-size:12px;
+                line-height:1.55;
+              }
+
+              .gold { color:#d4af37; font-weight:800; }
+              .cyan { color:#00e5ff; font-weight:800; }
+              .red { color:#ff5c5c; font-weight:800; }
+              .green { color:#5cff98; font-weight:800; }
+
+              .row {
+                display:grid;
+                grid-template-columns: 1fr 1fr;
+                gap:6px;
+                margin-bottom:6px;
+              }
+
+              .leaflet-control-layers {
+                direction:ltr;
+                text-align:left;
+              }
+
+              .leaflet-popup-content {
+                direction:ltr;
+                text-align:left;
+                font-size:12px;
+              }
+
+              #settings {
+                display:none;
+                position:absolute;
+                z-index:9999;
+                top:85px;
+                left:8px;
+                right:8px;
+                background:#071013;
+                border:1px solid rgba(212,175,55,.45);
+                border-radius:14px;
+                padding:10px;
+                box-shadow:0 0 25px rgba(0,0,0,.75);
+              }
+
+              #settings textarea {
+                width:100%;
+                height:70px;
+                box-sizing:border-box;
+                direction:ltr;
+                text-align:left;
+              }
+            </style>
+          </head>
+
+          <body>
+            <div id="app">
+              <div id="header">
+                <div class="title">بوح التضاريس | منظومة أبوعزيزه V11 REAL MAPS</div>
+                <div class="sub">GPS + Real Satellite + Terrain + NASA GIBS + Online Layers + KML Export</div>
+              </div>
+
+              <div id="toolbar">
+                <button onclick="goGPS()">GPS</button>
+                <button onclick="addManualTarget()">حفظ نقطة</button>
+                <button onclick="exportKML()">KML</button>
+                <button onclick="toggleSettings()">إعدادات</button>
+              </div>
+
+              <div id="settings">
+                <div class="gold">رابط طبقة XYZ مخصصة</div>
+                <div style="font-size:11px;color:#aab;margin:4px 0">
+                  ضع هنا رابط Tile XYZ مثل Sentinel Hub أو أي مزود أقمار عند توفر API.
+                  مثال الصيغة: https://server/tiles/{z}/{x}/{y}.png
+                </div>
+                <textarea id="customUrl" placeholder="https://.../{z}/{x}/{y}.png"></textarea>
+                <div class="row">
+                  <button onclick="addCustomLayer()">إضافة الطبقة</button>
+                  <button onclick="toggleSettings()">إغلاق</button>
+                </div>
+              </div>
+
+              <div id="map"></div>
+
+              <div id="panel">
+                <span class="cyan">جاهز.</span>
+                اضغط على الخريطة لاستخراج الإحداثيات والتحليل.
+              </div>
+            </div>
+
+            <script>
+              const panel = document.getElementById("panel");
+
+              const targets = [
+                {id:"A1", lat:19.793522, lon:36.556198, group:"ANALOG", kind:"GPZ Hand-Pit Dark Regolith", score:92},
+                {id:"A2", lat:19.834457, lon:36.478347, group:"ANALOG", kind:"Loader Expansion Dark Regolith", score:88},
+                {id:"A3", lat:20.492444, lon:36.348738, group:"ANALOG", kind:"Dark Knoll / Pediment", score:84},
+                {id:"A4", lat:20.494440, lon:36.360965, group:"ANALOG", kind:"Hybrid Dark Regolith-Wadi Corridor", score:83},
+                {id:"A5", lat:19.547212, lon:36.280184, group:"ANALOG", kind:"Dark Pediment / Hill-Foot Strip", score:86},
+                {id:"A6", lat:21.075710, lon:36.341820, group:"ANALOG", kind:"Mountain Feeder / Wadi Interface", score:82},
+                {id:"TargetB", lat:20.780500, lon:36.450700, group:"TARGET", kind:"HOLD+ Landsat/ASTER candidate", score:70},
+                {id:"Z01", lat:20.802185, lon:36.380156, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:79},
+                {id:"Z02", lat:20.754163, lon:36.371198, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:78},
+                {id:"Z03", lat:20.904043, lon:36.449256, group:"CANDIDATE", kind:"Fusion HOLD+ Candidate", score:76},
+                {id:"R01", lat:19.999442, lon:37.015231, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:69},
+                {id:"R02", lat:19.998824, lon:36.960774, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:68},
+                {id:"R03", lat:19.898553, lon:36.735764, group:"REGIONAL", kind:"Regional 300m Grid Candidate", score:68}
+              ];
+
+              let saved = JSON.parse(localStorage.getItem("BOUH_SAVED_TARGETS") || "[]");
+              let lastTap = null;
+              let gpsMarker = null;
+
+              const map = L.map("map", {
+                center:[19.793522,36.556198],
+                zoom:10,
+                zoomControl:true,
+                preferCanvas:true
+              });
+
+              const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom:19,
+                attribution:"OSM"
+              });
+
+              const esriImagery = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+                maxZoom:19,
+                attribution:"Esri World Imagery"
+              });
+
+              const esriTerrain = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}", {
+                maxZoom:13,
+                attribution:"Esri Terrain"
+              });
+
+              const esriHillshade = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", {
+                maxZoom:13,
+                opacity:0.65,
+                attribution:"Esri Hillshade"
+              });
+
+              const openTopo = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+                maxZoom:17,
+                attribution:"OpenTopoMap"
+              });
+
+              const gibsVIIRS = L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg", {
+                maxZoom:9,
+                attribution:"NASA GIBS VIIRS",
+                opacity:0.90
+              });
+
+              const gibsMODIS = L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg", {
+                maxZoom:9,
+                attribution:"NASA GIBS MODIS",
+                opacity:0.90
+              });
+
+              esriImagery.addTo(map);
+
+              const targetLayer = L.layerGroup().addTo(map);
+              const savedLayer = L.layerGroup().addTo(map);
+              const analysisLayer = L.layerGroup().addTo(map);
+
+              const baseLayers = {
+                "Satellite | Esri World Imagery": esriImagery,
+                "Street | OpenStreetMap": osm,
+                "Terrain | Esri Terrain": esriTerrain,
+                "Topo | OpenTopoMap": openTopo,
+                "NASA VIIRS True Color": gibsVIIRS,
+                "NASA MODIS True Color": gibsMODIS
+              };
+
+              const overlays = {
+                "Hillshade Overlay": esriHillshade,
+                "BOUH Targets": targetLayer,
+                "Saved Targets": savedLayer,
+                "Analysis Lines": analysisLayer
+              };
+
+              L.control.layers(baseLayers, overlays, {collapsed:true}).addTo(map);
+              L.control.scale({imperial:false}).addTo(map);
+
+              function iconColor(t) {
+                if (t.group === "ANALOG") return "#d4af37";
+                if (t.group === "TARGET") return "#ff5c5c";
+                if (t.group === "CANDIDATE") return "#00e5ff";
+                if (t.group === "USER") return "#5cff98";
+                return "#ffffff";
+              }
+
+              function markerHtml(color) {
+                return `<div style="
+                  width:18px;height:18px;border-radius:50%;
+                  background:${color};
+                  border:2px solid #05070a;
+                  box-shadow:0 0 14px ${color};
+                "></div>`;
+              }
+
+              function addMarker(t, layer) {
+                const m = L.marker([t.lat,t.lon], {
+                  icon:L.divIcon({
+                    html:markerHtml(iconColor(t)),
+                    className:"",
+                    iconSize:[18,18],
+                    iconAnchor:[9,9]
+                  })
+                });
+
+                m.bindPopup(`
+                  <b>${t.id}</b><br>
+                  ${t.kind}<br>
+                  Group: ${t.group}<br>
+                  Score: ${t.score}%<br>
+                  Lat: ${t.lat.toFixed(6)}<br>
+                  Lon: ${t.lon.toFixed(6)}
+                `);
+
+                m.addTo(layer);
+              }
+
+              function refreshMarkers() {
+                targetLayer.clearLayers();
+                savedLayer.clearLayers();
+                targets.forEach(t => addMarker(t, targetLayer));
+                saved.forEach(t => addMarker(t, savedLayer));
+              }
+
+              refreshMarkers();
+
+              function distanceKm(a,b,c,d) {
+                const R=6371.0088;
+                const p1=a*Math.PI/180;
+                const p2=c*Math.PI/180;
+                const dp=(c-a)*Math.PI/180;
+                const dl=(d-b)*Math.PI/180;
+                const x=Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+                return R*2*Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+              }
+
+              function nearest(lat,lon) {
+                let best=targets[0], bd=999999;
+                for (const t of targets) {
+                  const d=distanceKm(lat,lon,t.lat,t.lon);
+                  if (d<bd) { bd=d; best=t; }
+                }
+                return {target:best, dist:bd};
+              }
+
+              function predict(lat,lon) {
+                const n = nearest(lat,lon);
+                const d = n.dist;
+
+                let structure = d < 5 ? 65 : d < 12 ? 35 : 10;
+                let alteration = n.target.group === "TARGET" || n.target.group === "CANDIDATE" ? 60 : 35;
+                let placer = d < 3 ? 55 : d < 8 ? 35 : 15;
+                let field = n.target.group === "ANALOG" && d < 5 ? 80 : 20;
+
+                const score = Math.max(0, Math.min(100,
+                  0.34*structure + 0.30*alteration + 0.20*placer + 0.16*field
+                ));
+
+                let cls="LOW", decision="OBSERVE ONLY";
+                if (score >= 85) { cls="S-TIER VEIN / SUPERGENE"; decision="FIELD PRIORITY 1"; }
+                else if (score >= 70) { cls="HIGH CANDIDATE"; decision="FIELD CHECK + SAMPLE"; }
+                else if (score >= 55) { cls="HOLD"; decision="FAST CHECK ONLY"; }
+
+                return {nearest:n.target, dist:d, structure, alteration, placer, field, score, cls, decision};
+              }
+
+              function drawAnalysis(lat,lon,p) {
+                analysisLayer.clearLayers();
+
+                L.circle([lat,lon], {
+                  radius: p.score >= 70 ? 700 : 350,
+                  color: p.score >= 70 ? "#ff5c5c" : "#00e5ff",
+                  weight:2,
+                  fillOpacity:0.10
+                }).addTo(analysisLayer);
+
+                L.polyline([[lat,lon],[p.nearest.lat,p.nearest.lon]], {
+                  color:"#d4af37",
+                  weight:2,
+                  dashArray:"6,6"
+                }).addTo(analysisLayer);
+
+                if (p.score >= 80) {
+                  L.polyline([
+                    [lat-0.010, lon-0.012],
+                    [lat, lon],
+                    [lat+0.012, lon+0.014]
+                  ], {
+                    color:"#ff2d2d",
+                    weight:5
+                  }).bindPopup("Quartz-Gold Veins (High Potential)").addTo(analysisLayer);
+                }
+              }
+
+              map.on("click", e => {
+                lastTap = e.latlng;
+                const p = predict(e.latlng.lat, e.latlng.lng);
+                drawAnalysis(e.latlng.lat, e.latlng.lng, p);
+
+                panel.innerHTML = `
+                  <span class="gold">CLICK COORDINATES</span><br>
+                  LAT=${e.latlng.lat.toFixed(6)}<br>
+                  LON=${e.latlng.lng.toFixed(6)}<br><br>
+
+                  <span class="cyan">NEAREST TARGET</span><br>
+                  ID=${p.nearest.id}<br>
+                  KIND=${p.nearest.kind}<br>
+                  DIST_KM=${p.dist.toFixed(2)}<br><br>
+
+                  <span class="green">PREDICTION</span><br>
+                  SCORE=${p.score.toFixed(2)}%<br>
+                  CLASS=${p.cls}<br>
+                  DECISION=${p.decision}<br><br>
+
+                  S=${p.structure.toFixed(2)} |
+                  A=${p.alteration.toFixed(2)} |
+                  P=${p.placer.toFixed(2)} |
+                  F=${p.field.toFixed(2)}<br><br>
+
+                  <span class="red">تنبيه:</span>
+                  هذه أولوية استهداف، وليست تأكيداً لوجود الذهب.
+                `;
+              });
+
+              function goGPS() {
+                if (window.BOUH) {
+                  BOUH.requestGPS();
+                } else if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(pos => {
+                    setNativeGPS(pos.coords.latitude, pos.coords.longitude);
+                  });
+                }
+              }
+
+              window.setNativeGPS = function(lat,lon) {
+                if (gpsMarker) map.removeLayer(gpsMarker);
+
+                gpsMarker = L.marker([lat,lon], {
+                  icon:L.divIcon({
+                    html:`<div style="width:22px;height:22px;border-radius:50%;background:#00e5ff;border:3px solid #05070a;box-shadow:0 0 18px #00e5ff"></div>`,
+                    className:"",
+                    iconSize:[22,22],
+                    iconAnchor:[11,11]
+                  })
+                }).bindPopup(`GPS<br>${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(map);
+
+                map.setView([lat,lon], 15);
+
+                panel.innerHTML = `
+                  <span class="cyan">GPS LOCK</span><br>
+                  LAT=${lat.toFixed(6)}<br>
+                  LON=${lon.toFixed(6)}
+                `;
+              }
+
+              function addManualTarget() {
+                if (!lastTap) {
+                  panel.innerHTML = `<span class="red">اضغط على الخريطة أولاً ثم احفظ النقطة.</span>`;
+                  return;
+                }
+
+                const p = predict(lastTap.lat, lastTap.lng);
+                const t = {
+                  id:"U" + Date.now(),
+                  lat:lastTap.lat,
+                  lon:lastTap.lng,
+                  group:"USER",
+                  kind:p.cls,
+                  score:Number(p.score.toFixed(2)),
+                  note:p.decision
+                };
+
+                saved.unshift(t);
+                localStorage.setItem("BOUH_SAVED_TARGETS", JSON.stringify(saved));
+                refreshMarkers();
+
+                panel.innerHTML = `
+                  <span class="green">تم حفظ النقطة</span><br>
+                  ${t.id}<br>
+                  LAT=${t.lat.toFixed(6)}<br>
+                  LON=${t.lon.toFixed(6)}<br>
+                  SCORE=${t.score}%
+                `;
+              }
+
+              function buildKML() {
+                let kml = `<?xml version="1.0" encoding="UTF-8"?>`;
+                kml += `<kml xmlns="http://www.opengis.net/kml/2.2"><Document>`;
+                kml += `<name>BOUH V11 Saved Targets</name>`;
+
+                for (const t of saved) {
+                  kml += `<Placemark>`;
+                  kml += `<name>${t.id} ${t.score}%</name>`;
+                  kml += `<description><![CDATA[${t.kind}<br>${t.note}]]></description>`;
+                  kml += `<Point><coordinates>${t.lon.toFixed(6)},${t.lat.toFixed(6)},0</coordinates></Point>`;
+                  kml += `</Placemark>`;
+                }
+
+                kml += `</Document></kml>`;
+                return kml;
+              }
+
+              function exportKML() {
+                const kml = buildKML();
+                if (window.BOUH) BOUH.saveKML("bouh_v11_targets.kml", kml);
+                else console.log(kml);
+              }
+
+              function toggleSettings() {
+                const s = document.getElementById("settings");
+                s.style.display = s.style.display === "block" ? "none" : "block";
+              }
+
+              function addCustomLayer() {
+                const url = document.getElementById("customUrl").value.trim();
+                if (!url) return;
+
+                try {
+                  const custom = L.tileLayer(url, {
+                    maxZoom:22,
+                    attribution:"Custom XYZ"
+                  }).addTo(map);
+
+                  panel.innerHTML = `<span class="green">تمت إضافة الطبقة المخصصة.</span><br>${url}`;
+                  toggleSettings();
+                } catch(e) {
+                  panel.innerHTML = `<span class="red">فشل إضافة الطبقة.</span>`;
+                }
+              }
+
+              panel.innerHTML = `
+                <span class="gold">BOUH V11 REAL MAPS READY</span><br>
+                اختر من زر الطبقات أعلى الخريطة:<br>
+                Satellite | Esri World Imagery<br>
+                Terrain | Esri Terrain<br>
+                Topo | OpenTopoMap<br>
+                NASA VIIRS / MODIS<br><br>
+                اضغط على أي موقع للتحليل.
+              `;
+            </script>
+          </body>
+          </html>
           EOF
 
       - name: Initialize Gradle Wrapper
@@ -1312,20 +846,16 @@ jobs:
           cd android_app
           chmod +x gradlew
           ./gradlew :app:assembleDebug --stacktrace
-          ./gradlew :app:assembleRelease --stacktrace
 
       - name: Collect APK
         run: |
           mkdir -p output
-          cp android_app/app/build/outputs/apk/debug/app-debug.apk output/BOUH-TERRAIN-V10-PRO-debug.apk
-          if [ -f android_app/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp android_app/app/build/outputs/apk/release/app-release-unsigned.apk output/BOUH-TERRAIN-V10-PRO-release-unsigned.apk
-          fi
+          cp android_app/app/build/outputs/apk/debug/app-debug.apk output/BOUH-TERRAIN-V11-REAL-MAPS-debug.apk
           ls -lah output
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BOUH-TERRAIN-V10-PRO-APK
-          path: output/*.apk
+          name: BOUH-TERRAIN-V11-REAL-MAPS-APK
+          path: output/BOUH-TERRAIN-V11-REAL-MAPS-debug.apk
           retention-days: 30
