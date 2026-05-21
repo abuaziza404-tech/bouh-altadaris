@@ -21,17 +21,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 8.10.2
-
-      - name: Create BOUH Terrain V8 Field Intelligence
+      - name: Create BOUH Terrain V8 Field Intelligence Project
         run: |
           rm -rf android_app
           mkdir -p android_app/app/src/main/java/com/abuaziza/bouhgoldpro
           mkdir -p android_app/app/src/main/res/values
 
+          # 1. Root settings.gradle
           cat > android_app/settings.gradle <<'EOF'
           pluginManagement {
               repositories { google(); mavenCentral(); gradlePluginPortal() }
@@ -44,14 +40,18 @@ jobs:
           include ":app"
           EOF
 
+          # 2. Root build.gradle (Correct Injection for AGP)
           cat > android_app/build.gradle <<'EOF'
           plugins {
               id "com.android.application" version "8.6.1" apply false
           }
           EOF
 
+          # 3. App build.gradle (Fully compatible with SDK 35 & Gradle 8.x)
           cat > android_app/app/build.gradle <<'EOF'
-          plugins { id "com.android.application" }
+          plugins {
+              id "com.android.application"
+          }
 
           android {
               namespace "com.abuaziza.bouhgoldpro"
@@ -64,9 +64,19 @@ jobs:
                   versionCode 800
                   versionName "15.8.0"
               }
+
+              buildTypes {
+                  release {
+                      minifyEnabled false
+                  }
+                  debug {
+                      debuggable true
+                  }
+              }
           }
           EOF
 
+          # 4. Styles Configuration
           cat > android_app/app/src/main/res/values/styles.xml <<'EOF'
           <resources>
               <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
@@ -79,6 +89,7 @@ jobs:
           </resources>
           EOF
 
+          # 5. Android Manifest
           cat > android_app/app/src/main/AndroidManifest.xml <<'EOF'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -92,20 +103,19 @@ jobs:
                   android:supportsRtl="true">
 
                   <activity
-                      android:name=".MainActivity"
+                      android:name="com.abuaziza.bouhgoldpro.MainActivity"
                       android:screenOrientation="portrait"
                       android:exported="true">
-
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
-
                   </activity>
               </application>
           </manifest>
           EOF
 
+          # 6. Java Source Code (MainActivity.java)
           cat > android_app/app/src/main/java/com/abuaziza/bouhgoldpro/MainActivity.java <<'EOF'
           package com.abuaziza.bouhgoldpro;
 
@@ -837,10 +847,18 @@ jobs:
           }
           EOF
 
-      - name: Build APK
+      # 7. Generate Gradle Wrapper Dynamically (Crucial Fix)
+      - name: Initialize Gradle Wrapper
         run: |
           cd android_app
-          gradle :app:assembleDebug --stacktrace
+          gradle wrapper --gradle-version 8.10.2
+
+      # 8. Build using the local Wrapper executable
+      - name: Build APK with Gradle Wrapper
+        run: |
+          cd android_app
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
 
       - name: Collect APK
         run: |
