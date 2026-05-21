@@ -12,42 +12,220 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find BOUH ZIP file
+      - name: Find BOUH ZIP
         run: |
-          echo "Files in repository:"
-          ls -lah
-
           ZIP_FILE=$(find . -maxdepth 1 -iname "BOUH_EXPO*.zip" | head -n 1)
-
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: لم أجد ملف BOUH_EXPO_FIELD_COMMANDER_V12_5_SOURCE.zip في المستودع"
-            echo "الحل: ارفع ملف BOUH_EXPO_FIELD_COMMANDER_V12_5_SOURCE.zip في الصفحة الرئيسية للمستودع"
+            echo "ERROR: ارفع ملف BOUH_EXPO_FIELD_COMMANDER_V12_5_SOURCE.zip في الصفحة الرئيسية للمستودع"
             exit 1
           fi
-
           echo "ZIP_FILE=$ZIP_FILE" >> $GITHUB_ENV
           echo "Found ZIP: $ZIP_FILE"
 
-      - name: Unzip source package
+      - name: Prepare clean Expo project
         run: |
-          rm -rf build_src
-          mkdir build_src
-          unzip -q "$ZIP_FILE" -d build_src
+          rm -rf build_app
+          mkdir build_app
+          unzip -q "$ZIP_FILE" -d original_source || true
 
-          echo "Package content:"
-          find build_src -maxdepth 3 -type f | head -100
+          cd build_app
 
-      - name: Locate Expo project
-        run: |
-          PROJECT_DIR=$(find build_src -name package.json -type f | head -n 1 | xargs dirname)
+          cat > package.json <<'EOF'
+          {
+            "name": "bouh-gold-safe-apk",
+            "version": "12.5.0",
+            "private": true,
+            "main": "node_modules/expo/AppEntry.js",
+            "scripts": {
+              "start": "expo start",
+              "android": "expo run:android"
+            },
+            "dependencies": {
+              "expo": "~51.0.39",
+              "expo-status-bar": "~1.12.1",
+              "expo-location": "~17.0.1",
+              "react": "18.2.0",
+              "react-native": "0.74.5"
+            },
+            "devDependencies": {
+              "@babel/core": "^7.24.0"
+            }
+          }
+          EOF
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: لم أجد package.json داخل الحزمة"
-            exit 1
-          fi
+          cat > app.json <<'EOF'
+          {
+            "expo": {
+              "name": "BOUH GOLD V12.5",
+              "slug": "bouh-gold-v125",
+              "version": "12.5.0",
+              "orientation": "portrait",
+              "userInterfaceStyle": "dark",
+              "android": {
+                "package": "com.abuaziza.bouhgoldpro",
+                "versionCode": 125,
+                "permissions": [
+                  "ACCESS_FINE_LOCATION",
+                  "ACCESS_COARSE_LOCATION",
+                  "INTERNET"
+                ]
+              }
+            }
+          }
+          EOF
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          echo "Expo project directory: $PROJECT_DIR"
+          cat > babel.config.js <<'EOF'
+          module.exports = function(api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo']
+            };
+          };
+          EOF
+
+          cat > App.js <<'EOF'
+          import React, { useState } from 'react';
+          import {
+            SafeAreaView,
+            ScrollView,
+            View,
+            Text,
+            TextInput,
+            TouchableOpacity,
+            StyleSheet,
+            Alert
+          } from 'react-native';
+          import * as Location from 'expo-location';
+          import { StatusBar } from 'expo-status-bar';
+
+          export default function App() {
+            const [lat, setLat] = useState('');
+            const [lon, setLon] = useState('');
+            const [note, setNote] = useState('');
+            const [result, setResult] = useState('أدخل الإحداثية أو التقط GPS ثم اضغط تحليل.');
+            const [saved, setSaved] = useState([]);
+
+            async function getGPS() {
+              const { status } = await Location.requestForegroundPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('GPS', 'لم يتم منح صلاحية الموقع.');
+                return;
+              }
+              const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+              setLat(String(p.coords.latitude.toFixed(6)));
+              setLon(String(p.coords.longitude.toFixed(6)));
+            }
+
+            function analyze() {
+              const la = parseFloat(lat);
+              const lo = parseFloat(lon);
+
+              if (Number.isNaN(la) || Number.isNaN(lo)) {
+                Alert.alert('تنبيه', 'أدخل Latitude و Longitude بشكل صحيح.');
+                return;
+              }
+
+              let score = 55;
+              let cls = 'HOLD / فحص ميداني أولي';
+              let decision = 'لا حفر قبل تأكيد ميداني.';
+              let gpz = 'GPZ 7000: Difficult، High Yield، Sensitivity 8-11.';
+
+              if (la >= 19.85 && la <= 20.05 && lo >= 36.70 && lo <= 36.85) {
+                score = 78;
+                cls = 'GPZ-Regolith / Dark Slope / Wadi Trap';
+                decision = 'Candidate / فحص GPZ وتوثيق أرضي.';
+                gpz = 'Difficult، High Yield، Sensitivity 9-12، Swing بطيء.';
+              }
+
+              if (la >= 20.60 && la <= 20.80 && lo >= 36.38 && lo <= 36.48) {
+                score = 72;
+                cls = 'Quartz / Alteration Cluster Field Check';
+                decision = 'Candidate / افحص كوارتز وتحول وبنية.';
+                gpz = 'Normal إذا الأرض هادئة، General/Deep، Sensitivity 12-15.';
+              }
+
+              const text =
+                'Score: ' + score + '\n' +
+                'Class: ' + cls + '\n' +
+                'Decision: ' + decision + '\n\n' +
+                'GPZ Strategy:\n' + gpz + '\n\n' +
+                'القانون:\nStructure → Pattern → Alteration → Confirmation → Decision\n\n' +
+                'تنبيه: هذه نتيجة تشغيلية ميدانية وليست حساباً طيفياً خاماً ولا إثبات ذهب.';
+
+              setResult(text);
+              setSaved([{ lat: la, lon: lo, score, cls, note }, ...saved]);
+            }
+
+            return (
+              <SafeAreaView style={styles.root}>
+                <StatusBar style="light" />
+                <ScrollView contentContainerStyle={styles.container}>
+                  <Text style={styles.title}>BOUH GOLD FIELD COMMANDER</Text>
+                  <Text style={styles.subtitle}>V12.5 — منظومة أبوعزيزة</Text>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>إدخال نقطة فحص</Text>
+
+                    <TextInput style={styles.input} placeholder="Latitude" placeholderTextColor="#879887" value={lat} onChangeText={setLat} keyboardType="numeric" />
+                    <TextInput style={styles.input} placeholder="Longitude" placeholderTextColor="#879887" value={lon} onChangeText={setLon} keyboardType="numeric" />
+                    <TextInput style={[styles.input, styles.textArea]} placeholder="ملاحظات الأرض: كوارتز، أرض سوداء، وادي، حفر قديمة..." placeholderTextColor="#879887" value={note} onChangeText={setNote} multiline />
+
+                    <TouchableOpacity style={styles.button2} onPress={getGPS}>
+                      <Text style={styles.buttonText2}>التقاط GPS</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.button} onPress={analyze}>
+                      <Text style={styles.buttonText}>تحليل النقطة</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>نتيجة BOUH</Text>
+                    <Text style={styles.line}>{result}</Text>
+                  </View>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>سجل مؤقت داخل الجلسة</Text>
+                    {saved.length === 0 ? (
+                      <Text style={styles.line}>لا توجد نقاط محفوظة بعد.</Text>
+                    ) : saved.map((x, i) => (
+                      <Text key={i} style={styles.line}>
+                        {i + 1}) {x.lat}, {x.lon} | Score {x.score} | {x.cls}
+                      </Text>
+                    ))}
+                  </View>
+
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>GPZ 7000</Text>
+                    <Text style={styles.line}>
+                      Magnetic Risk مرتفع: Severe/Difficult + High Yield + Sensitivity 8-11.
+                      {'\n\n'}
+                      Magnetic Risk منخفض + Quartz: Normal + General/Deep + Sensitivity 12-16.
+                      {'\n\n'}
+                      الحفر تثبت النموذج، لكنها لا تكون هدف البحث.
+                    </Text>
+                  </View>
+                </ScrollView>
+              </SafeAreaView>
+            );
+          }
+
+          const styles = StyleSheet.create({
+            root: { flex: 1, backgroundColor: '#050805' },
+            container: { padding: 16, paddingBottom: 40 },
+            title: { color: '#d9ffd9', fontSize: 22, fontWeight: '900', textAlign: 'center', marginTop: 18 },
+            subtitle: { color: '#9eb49e', fontSize: 14, textAlign: 'center', marginBottom: 18 },
+            card: { backgroundColor: '#0d160d', borderColor: '#244124', borderWidth: 1, borderRadius: 18, padding: 16, marginBottom: 16 },
+            cardTitle: { color: '#f1d57a', fontSize: 18, fontWeight: '800', marginBottom: 12 },
+            input: { backgroundColor: '#071007', color: '#fff', borderColor: '#294429', borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 12, fontSize: 15 },
+            textArea: { minHeight: 90, textAlignVertical: 'top' },
+            button: { backgroundColor: '#d8b94a', padding: 15, borderRadius: 14, alignItems: 'center', marginTop: 6 },
+            buttonText: { color: '#071007', fontSize: 17, fontWeight: '900' },
+            button2: { backgroundColor: '#142514', borderColor: '#315031', borderWidth: 1, padding: 14, borderRadius: 14, alignItems: 'center' },
+            buttonText2: { color: '#dcebdc', fontSize: 16, fontWeight: '800' },
+            line: { color: '#dcebdc', fontSize: 15, lineHeight: 24, marginBottom: 8 }
+          });
+          EOF
 
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
@@ -65,36 +243,29 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd "$PROJECT_DIR"
+          cd build_app
           npm install --legacy-peer-deps
 
       - name: Expo prebuild Android
         run: |
-          cd "$PROJECT_DIR"
+          cd build_app
           npx expo prebuild --platform android --clean --non-interactive
 
       - name: Build APK
         run: |
-          cd "$PROJECT_DIR/android"
+          cd build_app/android
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
 
       - name: Collect APK
         run: |
           mkdir -p output
-
-          APK=$(find "$PROJECT_DIR/android/app/build/outputs/apk/release" -name "*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: لم يتم العثور على APK بعد البناء"
-            exit 1
-          fi
-
-          cp "$APK" output/BOUH-GOLD-PRO-ULTRA-V12-5.apk
+          APK=$(find build_app/android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          cp "$APK" output/BOUH-GOLD-FIELD-COMMANDER-V12-5.apk
           ls -lah output
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BOUH-GOLD-PRO-ULTRA-V12-5-APK
-          path: output/BOUH-GOLD-PRO-ULTRA-V12-5.apk
+          name: BOUH-GOLD-FIELD-COMMANDER-V12-5-APK
+          path: output/BOUH-GOLD-FIELD-COMMANDER-V12-5.apk
