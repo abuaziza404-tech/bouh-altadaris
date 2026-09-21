@@ -1,54 +1,33 @@
-# Abuaziza AI — نموذج خاص قابل للتطوير
+# Abuaziza AI — Android integration module
 
-هذا المجلد يحتوي على محرك محلي قابل للدمج في مشروع Android الذي يبنيه Workflow الخاص بك.
+## Delivered in this iteration
 
-## ما يقدمه المحرك
+- Multi-purpose Arabic assistant screen.
+- Offline intent routing for general, software, analysis, creative, and prospecting requests.
+- Prospecting screen with transparent surface-indicator scoring.
+- Evidence and missing-data reporting.
+- No claim of confirmed gold.
+- No API key or secret embedded in the application.
 
-- فهم نوايا عربية أساسي دون إنترنت.
-- مسار مخصص لتحليل طلبات التنقيب.
-- تقييم أولوية الهدف عبر مؤشرات سطحية وميدانية.
-- قائمة بالأدلة الموجودة والمؤشرات الناقصة.
-- لا يعلن وجود الذهب؛ يعرض أولوية الفحص فقط.
+## Build integration
 
-## الدمج مع Workflow
-
-انسخ الملف:
+Copy these Java files into the generated Android project:
 
 ```text
 android-engine/app/src/main/java/com/abuaziza/ai/AbuazizaAIEngine.java
+android-engine/app/src/main/java/com/abuaziza/ai/MainActivity.java
 ```
 
-إلى:
+The generated project must define:
 
 ```text
-app/src/main/java/com/abuaziza/ai/AbuazizaAIEngine.java
+com.abuaziza.ai.R.id.root_container
+com.abuaziza.ai.R.drawable.bg_card
+com.abuaziza.ai.R.drawable.bg_input
 ```
 
-ثم عدّل `MainActivity` ليستدعي:
+The existing clean-project workflow can generate the resource files and then compile the module.
 
-```java
-AbuazizaAIEngine.Reply reply = AbuazizaAIEngine.respond(prompt);
-```
+## Release status
 
-ولتقييم هدف ميداني:
-
-```java
-AbuazizaAIEngine.ProspectingResult result =
-    AbuazizaAIEngine.scoreProspect(
-        note,
-        structure,
-        faultContact,
-        quartz,
-        silica,
-        clay,
-        wadi,
-        darkRegolith,
-        oldWork,
-        repeatedSignal,
-        labSample
-    );
-```
-
-## المرحلة التالية
-
-لتحويله إلى نموذج AI فعلي، أضف Backend خاصاً بك خلف HTTPS، مع مصادقة ومحددات استخدام. لا تضع مفاتيح API أو كلمات مرور داخل APK أو GitHub Actions.
+This commit contains the application module and product specification. A signed APK release requires running the repository's Android Actions workflow; this API session cannot execute Actions or publish a GitHub Release directly.
