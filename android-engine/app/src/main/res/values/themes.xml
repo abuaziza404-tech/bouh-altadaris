@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Abuaziza" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">@color/abuaziza_bg</item>
+        <item name="android:navigationBarColor">@color/abuaziza_bg</item>
+    </style>
+</resources>
